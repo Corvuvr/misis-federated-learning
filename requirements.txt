@@ -1,0 +1,5 @@
+flwr==1.8.0
+tensorflow-cpu
+numpy
+prometheus_client
+flwr_datasets[vision]

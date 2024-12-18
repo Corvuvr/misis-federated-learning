@@ -1,0 +1,15 @@
+# Use an official Python runtime as a parent image
+FROM tensorflow/tensorflow
+
+# Install gcc and other dependencies
+RUN useradd corvuvr -m && \
+    passwd -d corvuvr && \
+    printf 'corvuvr ALL=(ALL) ALL\n' | tee -a /etc/sudoers 
+
+WORKDIR /app
+COPY ./requirements.txt /app/requirements.txt
+# Create user
+USER corvuvr
+# Copy the requirements file into the container
+RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR /app
