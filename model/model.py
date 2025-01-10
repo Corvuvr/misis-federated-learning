@@ -1,6 +1,5 @@
 import tensorflow as tf
 
-
 # Class for the model. In this case, we are using the MobileNetV2 model from Keras
 class Model:
     def __init__(self, learning_rate, classes_):

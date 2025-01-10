@@ -1,5 +1,6 @@
 # Use an official Python runtime as a parent image
-FROM archlinux
+FROM archlinux 
+#:multilib-devel-20241215.0.289170
 
 # Install gcc and other dependencies
 RUN pacman -Syu \
@@ -8,8 +9,8 @@ RUN pacman -Syu \
     pkg-config \
     hdf5 \
     tree \
-    python \
-    python-pip \
+    #python \
+    #python-pip \
     git --noconfirm \
     && rm -rf /var/lib/apt/lists/*
 
@@ -23,6 +24,7 @@ WORKDIR /home/corvuvr
 COPY ./requirements.txt /home/corvuvr/requirements.txt
 # Create user
 USER corvuvr
+RUN git clone https://aur.archlinux.org/python311.git && cd python311 && makepkg -si --noconfirm
 # Copy the requirements file into the container
-RUN python3 -m venv .venv && source .venv/bin/activate && pip install --no-cache-dir -r requirements.txt
+RUN python3.11 -m venv .venv && source .venv/bin/activate && python3.11 -V && pip install --no-cache-dir -r requirements.txt
 WORKDIR /app
