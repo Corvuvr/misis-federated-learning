@@ -128,11 +128,11 @@ services:
     command: python client.py --server_address=server:8080 --data_percentage=0.6 --client_id=3 --total_clients=3 --batch_size=256 --learning_rate=0.05
     deploy:
       resources:
-        # reservations:
-          # devices:
-          #   - driver: nvidia
-          #     count: all
-          #     capabilities: [gpu]
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
         limits:
           cpus: "3"
           memory: "5g"
