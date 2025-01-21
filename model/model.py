@@ -6,7 +6,7 @@ class Model:
         self.learning_rate = learning_rate
         self.loss_function = tf.keras.losses.SparseCategoricalCrossentropy()
         self.model = tf.keras.applications.MobileNetV2(
-            (32, 32, 3), alpha=0.1, classes=classes_, weights=None
+            (64, 64, 3), weights=None, classes=classes_, alpha=0.4
         )
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
 

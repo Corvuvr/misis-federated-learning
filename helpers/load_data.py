@@ -40,4 +40,7 @@ def load_data(data_sampling_percentage=0.5, client_id=1, total_clients=2):
     indices = np.random.choice(len(x_train), num_samples, replace=False)
     x_train, y_train, z_train = x_train[indices], y_train[indices], z_train[indices]
 
+    x_train = tf.image.resize(images=x_train, size=[x_train.shape[1]*2, x_train.shape[2]*2], preserve_aspect_ratio=True)
+    x_test = tf.image.resize(images=x_test, size=[x_test.shape[1]*2, x_test.shape[2]*2], preserve_aspect_ratio=True)
+    
     return (x_train, y_train, z_train), (x_test, y_test, z_test)

@@ -1,6 +1,5 @@
 # Use an official Python runtime as a parent image
-FROM archlinux 
-#:multilib-devel-20241215.0.289170
+FROM archlinux:multilib-devel-20241215.0.289170
 
 # Install gcc and other dependencies
 RUN pacman -Syu \

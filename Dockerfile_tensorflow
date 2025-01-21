@@ -1,6 +1,5 @@
 # Use an official Python runtime as a parent image
 FROM tensorflow/tensorflow:latest-gpu
-#FROM tensorflow/tensorflow:latest
 
 # Install gcc and other dependencies
 RUN useradd corvuvr -m && \

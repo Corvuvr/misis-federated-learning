@@ -12,3 +12,14 @@ __pycache__/
 
 # ignore .csv files
 *.csv
+
+# ignore runtime artifacts
+results/**/*.json
+results/**/*.h5
+
+# ignore cifar10-related code
+10
+
+# ignore non-federated learning code
+client-solo.py
+docker-compose.solo.yml
