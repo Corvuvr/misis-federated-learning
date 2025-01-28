@@ -3,20 +3,13 @@ import json
 import argparse
 import logging
 import os
+import requests
 
 import flwr as fl
 import tensorflow as tf
 
 from model.model import Model
-from helpers.load_data import load_data
-
-load_data()
-
-logging.basicConfig(level=logging.INFO)  # Configure logging
-logger = logging.getLogger(__name__)  # Create logger for the module
-
-# Make TensorFlow log less verbose
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+from helpers.load_data import load_data, SERVER_LOCAL_IP
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="Flower client")
@@ -30,7 +23,9 @@ parser.add_argument(
 parser.add_argument(
     "--learning_rate", type=float, default=0.1, help="Learning rate for the optimizer"
 )
-parser.add_argument("--client_id", type=int, default=1, help="Unique ID for the client")
+parser.add_argument(
+    "--client_id", type=int, default=1, help="Unique ID for the client"
+)
 parser.add_argument(
     "--total_clients", type=int, default=2, help="Total number of clients"
 )
@@ -39,6 +34,21 @@ parser.add_argument(
 )
 
 args = parser.parse_args()
+
+wait_for_server: bool = True
+while wait_for_server:
+    time.sleep(2)
+    try:
+        if requests.get(f'http://{SERVER_LOCAL_IP}:7272/establish_connection'):
+            wait_for_server = False
+    except:
+        print("Waiting for server...")
+
+logging.basicConfig(level=logging.INFO)  # Configure logging
+logger = logging.getLogger(__name__)  # Create logger for the module
+
+# Make TensorFlow log less verbose
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 checkpoint_path = "/results/client.weights.h5"
 cp_callback = tf.keras.callbacks.ModelCheckpoint(
@@ -93,7 +103,7 @@ class Client(fl.client.NumPyClient):
         global start
         # Train the model
         history = model.get_model().fit(
-            self.train_images, self.train_labels, batch_size=self.args.batch_size, callbacks=[cp_callback], epochs=10
+            self.train_images, self.train_labels, batch_size=self.args.batch_size, callbacks=[cp_callback], epochs=2
         )
         time_elapsed = time.time() - start
         # Calculate evaluation metric

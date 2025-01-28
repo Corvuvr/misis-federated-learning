@@ -70,13 +70,16 @@ services:
       dockerfile: Dockerfile_ubuntu
     command: python server.py --number_of_rounds=500
     environment:
+      PYTHONUNBUFFERED: 1
       FLASK_RUN_PORT: 6000
       DOCKER_HOST_IP: host.docker.internal
     volumes:
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./results/server:/workdir
     ports:
       - "6000:6000"
+      - "7272:7272"
       - "8265:8265"
       - "8000:8000"
     stop_signal: SIGINT

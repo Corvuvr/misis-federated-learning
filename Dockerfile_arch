@@ -13,6 +13,8 @@ RUN pacman -Syu \
     git --noconfirm \
     && rm -rf /var/lib/apt/lists/*
 
+RUN pacman -Syy
+
 # Install gcc and other dependencies
 RUN pacman -S --needed --noconfirm sudo && \
     useradd corvuvr -m && \

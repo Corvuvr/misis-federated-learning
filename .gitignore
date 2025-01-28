@@ -16,7 +16,7 @@ __pycache__/
 # ignore runtime artifacts
 results/**/*.json
 results/**/*.h5
-
+results/**/~*
 # ignore cifar10-related code
 10
 

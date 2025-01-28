@@ -17,7 +17,7 @@ class FedCustom(fl.server.strategy.FedAvg):
         self, accuracy_gauge: Gauge = None, loss_gauge: Gauge = None, *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
-
+        print(f'{args=}')
         self.accuracy_gauge = accuracy_gauge
         self.loss_gauge = loss_gauge
 
@@ -59,4 +59,4 @@ class FedCustom(fl.server.strategy.FedAvg):
 
         metrics_aggregated = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
 
-        return loss_aggregated, metrics_aggregated
+        return loss_aggregated, metrics_aggregated#, {"hello": "world"}
