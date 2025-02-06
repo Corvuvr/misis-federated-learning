@@ -68,7 +68,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_ubuntu
-    command: python server.py --number_of_rounds=500
+    command: python server.py --number_of_rounds=500 --flask_address=172.19.0.5
     environment:
       PYTHONUNBUFFERED: 1
       FLASK_RUN_PORT: 6000
@@ -90,19 +90,19 @@ services:
       resources:
         limits:
           cpus: "0.3"
-          memory: "3g"
+          memory: "10g"
   
   client1:
     container_name: client1
     build:
       context: .
       dockerfile: Dockerfile_ubuntu
-    command: python client.py --server_address=server:8080 --data_percentage=0.2 --client_id=1 --total_clients=3 --batch_size=32 --learning_rate=0.0002
+    command: python client.py --data-percentage=0.1 --learning_rate=0.0016 --batch_size=32 --server_address=server:8080 --flask_address=172.19.0.5 --client_id=1 --total_clients=3 --local=False
     deploy:
       resources:
         limits:
           cpus: "1"
-          memory: "3g"
+          memory: "7g"
     volumes:
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
@@ -122,12 +122,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_arch
-    command: /bin/bash -c 'source /home/corvuvr/.venv/bin/activate && cd /app && python client.py --server_address=server:8080 --data_percentage=0.3 --client_id=2 --total_clients=3 --batch_size=32 --learning_rate=0.0004'
+    command: /bin/bash -c 'source /home/corvuvr/.venv/bin/activate && cd /app && python client.py --data-percentage=0.1 --learning_rate=0.0016 --batch_size=32 --server_address=server:8080 --flask_address=172.19.0.5 --client_id=2 --total_clients=3 --local=False'
     deploy:
       resources:
         limits:
           cpus: "1"
-          memory: "4g"
+          memory: "7g"
     volumes:
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
@@ -147,7 +147,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_tensorflow
-    command: python client.py --server_address=server:8080 --data_percentage=0.6 --client_id=3 --total_clients=3 --batch_size=32 --learning_rate=0.0008
+    command: python client.py --learning_rate=0.0016 --data-percentage=0.1 --batch_size=32 --client_id=3 --total_clients=3 --server_address=server:8080 --flask_address=172.19.0.5 --local=False
     deploy:
       resources:
         # reservations:
@@ -157,7 +157,7 @@ services:
           #     capabilities: [gpu]
         limits:
           cpus: "2"
-          memory: "5g"
+          memory: "7g"
     volumes:
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock

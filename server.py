@@ -37,6 +37,9 @@ parser.add_argument(
     default=100,
     help="Number of FL rounds (default: 100)",
 )
+parser.add_argument(
+    "--flask_address", type=str, default="0.0.0.0", help="Address of the data server"
+)
 args = parser.parse_args()
 
 # Function to Start Federated Learning Server
@@ -79,6 +82,7 @@ dataset_sender = Flask(__name__)
 
 @dataset_sender.route('/establish_connection')
 def establish_connection():
+    print("omg hiiii!")
     return "Hello"
 
 @dataset_sender.route('/load_dataset')
@@ -114,11 +118,7 @@ def load_data_proxy():
     partition_coarse_labels = np.array(coarse_labels[train_partition_indicies]).astype('int16')
     partition_image_metadata = np.array(partition_images.shape).astype('int16')
     
-    print(f'{partition_images.dtype=} {partition_images.shape=} {partition_images.size}\n')
-    print(f'{partition_fine_labels.dtype=} {partition_fine_labels.shape=} {partition_fine_labels.size}\n')
-    print(f'{partition_coarse_labels.dtype=} {partition_coarse_labels.shape=} {partition_coarse_labels.size}\n')
     partition_images = partition_images.flatten().astype('float32')
-    print(f'{partition_images.dtype=} {partition_images.shape=} {partition_images.size}\n')
 
     # Save data to zip
     data = (partition_image_metadata, partition_images, partition_fine_labels, partition_coarse_labels)
@@ -138,8 +138,8 @@ def load_data_proxy():
         download_name=zip_filename,
     )
 
-def run_flask_server(host='172.21.0.5', port=7272):
-    dataset_sender.run(host=host, port=port)
+def run_flask_server(host='172.19.0.5', port=7272):
+    dataset_sender.run(host=args.flask_address, port=port)
 
 # Main Function
 if __name__ == "__main__":

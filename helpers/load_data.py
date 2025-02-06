@@ -9,12 +9,33 @@ from flwr_datasets import FederatedDataset
 logging.basicConfig(level=logging.INFO)  # Configure logging
 logger = logging.getLogger(__name__)  # Create logger for the module
 
-SERVER_LOCAL_IP = "172.21.0.5"
+def load_data_local(train_split: float = 0.5, scale_factor: int = 1):
+    
+    # Download dataset
+    fds = FederatedDataset(dataset="cifar100", partitioners={"train": 1})
+    data = fds.load_partition(0, "train")
+    data.set_format("numpy")
 
-def load_data(data_sampling_percentage=0.5, client_id=1, total_clients=2):
+    # Divide data on each client: 80% train, 20% test
+    partition = data.train_test_split(test_size=1-train_split, seed=42)
+    x_train, y_train, z_train = \
+        partition["train"]["img"] / 255.0, \
+        partition["train"]["fine_label"], \
+        partition["train"]["coarse_label"]
+    x_test, y_test, z_test = \
+        partition["test"]["img"] / 255.0, \
+        partition["test"]["fine_label"], \
+        partition["test"]["coarse_label"]
+
+    # Scale
+    x_train, x_test = scale_input(scale=scale_factor, args=(x_train, x_test))
+
+    return (x_train, y_train, z_train), (x_test, y_test, z_test)
+
+def load_data(client_id: int, train_split: float = 0.5, scale_factor: int = 1, server_ip: str = "0.0.0.0"):
     
     # Request data
-    buffer = requests.get(f'http://{SERVER_LOCAL_IP}:7272/load_dataset', params={"client_id": client_id}).content
+    buffer = requests.get(f'http://{server_ip}:7272/load_dataset', params={"client_id": client_id}).content
     
     print(f'{zipfile.ZipFile(io.BytesIO(buffer)).infolist()=}')
     
@@ -30,7 +51,6 @@ def load_data(data_sampling_percentage=0.5, client_id=1, total_clients=2):
         dtype='float32'
     )
     images = np.reshape(images, newshape=meta)
-    print(f'{images.shape=}')
 
     # Get labels
     fine_labels = np.frombuffer(
@@ -42,13 +62,37 @@ def load_data(data_sampling_percentage=0.5, client_id=1, total_clients=2):
         dtype='int16'
     )
 
-    # Split data: 80% train, 20% test
-    split_factor: float = 0.8
-    split_point: int = int(len(images) * split_factor)
-    (x_test, y_test, z_test) = images[split_point:], fine_labels[split_point:], coarse_labels[split_point:]
-    (x_train, y_train, z_train) = images[:split_point], fine_labels[:split_point], coarse_labels[:split_point]
-    
-    print(f'{x_test.shape=} {x_test.dtype=}\n{y_test.shape=} {z_test.shape=}')
-    print(f'{x_train.shape=} {x_train.dtype=}\n{y_train.shape=} {z_train.shape=}')
+    # Shuffle data
+    images, fine_labels, coarse_labels = shuffle(images, fine_labels, coarse_labels, percentage=1.0)
+
+    # Split data: train=train_split, test=1-train_split
+    split_point: int = int(len(images) * train_split)
+    (x_train, y_train, z_train) = images[split_point:], fine_labels[split_point:], coarse_labels[split_point:]
+    (x_test, y_test, z_test) = images[:split_point], fine_labels[:split_point], coarse_labels[:split_point]
+
+    # Scale
+    x_train, x_test = scale_input(scale=scale_factor, args=(x_train, x_test))
 
     return (x_train, y_train, z_train), (x_test, y_test, z_test)
+
+def shuffle(percentage, args):
+    it = iter(args)
+    the_len = len(next(it))
+    if not all(len(l) == the_len for l in it):
+        raise ValueError('ERROR: lists are not of the same length!')
+    
+    # Apply data sampling
+    num_samples = int(percentage * len(args[0]))
+    indices = np.random.choice(len(args[0]), num_samples, replace=False)
+    for arg in args:
+        yield arg[indices]
+
+def scale_input(args, scale: int = 1):
+    for arg in args:
+        yield np.resize(
+            arg, 
+            (arg.shape[0], arg.shape[1]*scale, arg.shape[2]*scale, arg.shape[3])
+        )
+
+def db(val):
+    print(f'Debug point:\t{val}')

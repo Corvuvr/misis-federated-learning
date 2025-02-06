@@ -17,6 +17,7 @@ __pycache__/
 results/**/*.json
 results/**/*.h5
 results/**/~*
+metrics/*
 # ignore cifar10-related code
 10
 
