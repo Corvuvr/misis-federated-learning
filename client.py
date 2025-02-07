@@ -29,6 +29,9 @@ parser.add_argument(
     "--epochs-per-subset", type=int, default=10, help="Epochs in each iterations"
 )
 parser.add_argument(
+    "--total-epochs", type=int, default=500, help="Total epochs"
+)
+parser.add_argument(
     "--scale", type=int, default=1, help="Scale the input of the model"
 )
 parser.add_argument(
@@ -61,7 +64,7 @@ args = parser.parse_args()
 print(f'{args=}')
 
 # Set globals
-LOCAL_LEARNING = False #args.local
+LOCAL_LEARNING = args.local
 COARSE_LEARNING = False
 CLIENT_FOLDER = "results" if LOCAL_LEARNING else "/results"
 num_classes = 20 if COARSE_LEARNING else 100
@@ -226,8 +229,9 @@ if __name__ == "__main__":
         with open('results/data.json', 'w', encoding='utf-8') as f:
             json.dump([], f, ensure_ascii=False, indent=4)
 
-        while accuracy < threshold:
+        while epochs <= args.total_epochs:
             params, num_examples, results = c.fit(params)
+            epochs += args.epochs_per_subset
             loss, _, accuracy = c.evaluate(params)
             accuracy = accuracy['accuracy']
             iterations += 1
