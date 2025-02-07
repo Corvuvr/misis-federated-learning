@@ -7,8 +7,8 @@ class Model:
         self.loss_function = tf.keras.losses.SparseCategoricalCrossentropy()
 
         input_shape = [32, 32, 3]
-        input_shape[0] *= scale_input * 2
-        input_shape[1] *= scale_input * 2
+        input_shape[0] *= scale_input
+        input_shape[1] *= scale_input
         input_shape=tuple(input_shape)
 
         print(f'{input_shape}')

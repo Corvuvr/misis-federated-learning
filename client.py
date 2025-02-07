@@ -117,7 +117,7 @@ class Client(fl.client.NumPyClient):
             server_ip=args.flask_address
         ) if not LOCAL_LEARNING else load_data_local(
             train_split=self.args.data_percentage,
-            scale_factor=self.args.total_clients
+            scale_factor=self.args.scale
         )
 
         self.x_train = x_train # img
