@@ -76,7 +76,7 @@ services:
     volumes:
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./results/server:/workdir
+      - ./results/server:/results
     ports:
       - "6000:6000"
       - "7272:7272"
@@ -106,7 +106,7 @@ services:
     volumes:
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./results/client1:/results
+      - ./results:/results
     ports:
       - "6001:6001"
     depends_on:
@@ -122,7 +122,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_arch
-    command: /bin/bash -c 'source /home/corvuvr/.venv/bin/activate && cd /app && python client.py --epochs-per-subset=1 --data-percentage=0.1 --learning_rate=0.0016 --batch_size=32 --server_address=server:8080 --flask_address=172.19.0.5 --client_id=2 --total_clients=3 '
+    command: /bin/bash -c 'source /home/corvuvr/.venv/bin/activate && cd /app && python client.py --epochs-per-subset=1 --data-percentage=0.1 --learning_rate=0.0016 --batch_size=32 --server_address=server:8080 --flask_address=172.19.0.5 --client_id=2 --total_clients=3'
     deploy:
       resources:
         limits:
@@ -131,7 +131,7 @@ services:
     volumes:
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./results/client2:/results
+      - ./results:/results
     ports:
       - "6002:6002"
     depends_on:
@@ -162,7 +162,7 @@ services:
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/machine-id:/etc/machine-id:ro
-      - ./results/client3:/results
+      - ./results:/results
     ports:
       - "6003:6003"
     depends_on:

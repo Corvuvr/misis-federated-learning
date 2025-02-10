@@ -76,13 +76,10 @@ def get_indicies_of_classes(data, classes: list[str]):
             yield i
 
 # Dataset sender
-total_clients = 0
-
 dataset_sender = Flask(__name__)
 
 @dataset_sender.route('/establish_connection')
 def establish_connection():
-    #print("omg hiiii!")
     return "Hello"
 
 @dataset_sender.route('/load_dataset')
@@ -122,7 +119,7 @@ def load_data_proxy():
 
     # Save data to zip
     data = (partition_image_metadata, partition_images, partition_fine_labels, partition_coarse_labels)
-    workdir = "/workdir/"
+    workdir = "/results/"
     zip_filename = f"~data{client_id}.zip"
     zip_filepath = f"{workdir}{zip_filename}"
     zip = zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED)
@@ -139,7 +136,7 @@ def load_data_proxy():
     )
 
 def run_flask_server(host='172.19.0.5', port=7272):
-    dataset_sender.run(host=args.flask_address, port=port)
+    dataset_sender.run(host=host, port=port)
 
 # Main Function
 if __name__ == "__main__":
@@ -164,7 +161,7 @@ if __name__ == "__main__":
     
     # Start Dataset Server 
     lock = threading.Lock()
-    thread = threading.Thread(target=run_flask_server, args=('0.0.0.0', 7272))
+    thread = threading.Thread(target=run_flask_server, args=(args.flask_address, 7272))
     thread.start()
 
     # Start FL Server

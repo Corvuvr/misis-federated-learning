@@ -9,6 +9,19 @@ from flwr_datasets import FederatedDataset
 logging.basicConfig(level=logging.INFO)  # Configure logging
 logger = logging.getLogger(__name__)  # Create logger for the module
 
+def shuffle(percentage, args):
+    it = iter(args)
+    the_len = len(next(it))
+    if not all(len(l) == the_len for l in it):
+        raise ValueError('ERROR: lists are not of the same length!')
+    db()
+    # Apply data sampling
+    num_samples = int(percentage * len(args[0]))
+    indices = np.random.choice(len(args[0]), num_samples, replace=False)
+    db()
+    for arg in args:
+        yield arg[indices]
+
 def load_data_local(train_split: float = 0.5, scale_factor: int = 1):
     
     # Download dataset
@@ -59,10 +72,9 @@ def load_data(client_id: int, train_split: float = 0.5, scale_factor: int = 1, s
         zipfile.ZipFile(io.BytesIO(buffer)).read(f'~tmp-{client_id}-{3}'),
         dtype='int16'
     )
-
+ 
     # Shuffle data
-    images, fine_labels, coarse_labels = shuffle(images, fine_labels, coarse_labels, percentage=1.0)
-
+    (images, fine_labels, coarse_labels) = shuffle(args=(images, fine_labels, coarse_labels), percentage=1.0)
     # Split data: train=train_split, test=1-train_split
     split_point: int = int(len(images) * train_split)
     (x_train, y_train, z_train) = images[split_point:], fine_labels[split_point:], coarse_labels[split_point:]
@@ -73,18 +85,6 @@ def load_data(client_id: int, train_split: float = 0.5, scale_factor: int = 1, s
 
     return (x_train, y_train, z_train), (x_test, y_test, z_test)
 
-def shuffle(percentage, args):
-    it = iter(args)
-    the_len = len(next(it))
-    if not all(len(l) == the_len for l in it):
-        raise ValueError('ERROR: lists are not of the same length!')
-    
-    # Apply data sampling
-    num_samples = int(percentage * len(args[0]))
-    indices = np.random.choice(len(args[0]), num_samples, replace=False)
-    for arg in args:
-        yield arg[indices]
-
 def scale_input(args, scale: int = 1):
     for arg in args:
         yield np.resize(
@@ -92,5 +92,8 @@ def scale_input(args, scale: int = 1):
             (arg.shape[0], arg.shape[1]*scale, arg.shape[2]*scale, arg.shape[3])
         )
 
-def db(val):
-    print(f'Debug point:\t{val}')
+class db:
+    count = 0
+    def __init__(self):
+        db.count += 1
+        print(f'Debug point:\t{db.count}')

@@ -66,7 +66,7 @@ print(f'{args=}')
 # Globals
 LOCAL_LEARNING = args.local
 COARSE_LEARNING = False
-CLIENT_FOLDER = "results" #if LOCAL_LEARNING else "/results"
+CLIENT_FOLDER = "results" if LOCAL_LEARNING else "/results"
 CLIENT_PREFIX: str = str(args.client_id) if not LOCAL_LEARNING else "-solo"
 JSON_PATH = f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.json'
 WEIGHTS_PATH = f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.weights.h5'
@@ -76,7 +76,7 @@ if not LOCAL_LEARNING:
     while wait_for_server:
         time.sleep(1)
         try:
-            if requests.get(f'http://{args.flask_server}:7272/establish_connection'):
+            if requests.get(f'http://{args.flask_address}:7272/establish_connection'):
                 wait_for_server = False
         except:
             print("Waiting for server...")
@@ -95,7 +95,7 @@ class Client(fl.client.NumPyClient):
         logger.info("Preparing data...")
         (x_train, y_train, z_train), (x_test, y_test, z_test) = load_data(
             client_id=self.args.client_id,
-            train_split = args.test_split, 
+            train_split = args.train_split, 
             scale_factor = args.scale, 
             server_ip=args.flask_address
         ) if not LOCAL_LEARNING else load_data_local(
@@ -207,15 +207,16 @@ if __name__ == "__main__":
         scale_input=args.scale
     )
     model.compile()
-
+    epochs = 0
     # Learning
     if LOCAL_LEARNING:
         with open(f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.json', 'w', encoding='utf-8') as f:
             json.dump([args.__dict__], f, ensure_ascii=False, indent=4)
         c = Client(args)
         params = c.get_parameters()
-        epochs = 0
+        
         while epochs <= args.total_epochs:
+            print(f"Epoch {epochs}...")
             params, num_examples, results = c.fit(params)
             epochs += args.epochs_per_subset
             c.evaluate(params)
