@@ -82,7 +82,7 @@ dataset_sender = Flask(__name__)
 
 @dataset_sender.route('/establish_connection')
 def establish_connection():
-    print("omg hiiii!")
+    #print("omg hiiii!")
     return "Hello"
 
 @dataset_sender.route('/load_dataset')

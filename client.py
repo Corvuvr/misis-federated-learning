@@ -1,7 +1,6 @@
 import os
 import time
 import json
-import random
 import logging
 import argparse
 import requests
@@ -10,6 +9,7 @@ import flwr as fl
 import tensorflow as tf
 
 from model.model import Model
+from helpers.plots import updatePlot
 from helpers.load_data import load_data, load_data_local, shuffle
 
 # Parse command line arguments
@@ -57,53 +57,36 @@ parser.add_argument(
 
 # Local args
 parser.add_argument(
-    "--local", type=bool, default=True, help="Whether to launch locally or as a federated client"
+    "--local", default=False, action='store_true', help="Whether to launch locally or as a federated client"
 )
 
 args = parser.parse_args()
 print(f'{args=}')
 
-# Set globals
+# Globals
 LOCAL_LEARNING = args.local
 COARSE_LEARNING = False
-CLIENT_FOLDER = "results" if LOCAL_LEARNING else "/results"
-num_classes = 20 if COARSE_LEARNING else 100
+CLIENT_FOLDER = "results" #if LOCAL_LEARNING else "/results"
+CLIENT_PREFIX: str = str(args.client_id) if not LOCAL_LEARNING else "-solo"
+JSON_PATH = f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.json'
+WEIGHTS_PATH = f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.weights.h5'
 
 if not LOCAL_LEARNING:
     wait_for_server: bool = True
     while wait_for_server:
-        time.sleep(2)
+        time.sleep(1)
         try:
             if requests.get(f'http://{args.flask_server}:7272/establish_connection'):
                 wait_for_server = False
         except:
             print("Waiting for server...")
+    print(f"Connection established. Initializing client{CLIENT_PREFIX}...")
 
-logging.basicConfig(level=logging.INFO)  # Configure logging
-logger = logging.getLogger(__name__)  # Create logger for the module
+# Logs
+logging.basicConfig(level=logging.INFO)     # Configure logging
+logger = logging.getLogger(__name__)        # Create logger for the module
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"    # Make TensorFlow log less verbose
 
-# Make TensorFlow log less verbose
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-
-checkpoint_path = f"{CLIENT_FOLDER}/client.weights.h5"
-cp_callback = tf.keras.callbacks.ModelCheckpoint(
-    filepath=checkpoint_path,
-    save_weights_only=True,
-    verbose=1
-)
-
-# Create an instance of the model and pass the learning rate as an argument
-model = Model(
-    learning_rate=args.learning_rate, 
-    classes_=num_classes,
-    alpha_=args.alpha,
-    scale_input=args.scale
-)
-
-# Compile the model
-model.compile()
-
-start: float = time.time()
 class Client(fl.client.NumPyClient):
     def __init__(self, args):
         super().__init__()
@@ -141,7 +124,6 @@ class Client(fl.client.NumPyClient):
 
     def fit(self, parameters, config=None):
         global epochs
-        global start
         global args
         global train_accuracy
         # Set the weights of the model
@@ -152,7 +134,14 @@ class Client(fl.client.NumPyClient):
             percentage=args.data_percentage,
             args=(self.train_images, self.train_labels)
         )
-        
+
+        # Add a callback that saves weights
+        cp_callback = tf.keras.callbacks.ModelCheckpoint(
+            filepath=WEIGHTS_PATH,
+            save_weights_only=True,
+            verbose=1
+        )
+
         # Train the model
         history = model.get_model().fit(
             train_images,
@@ -162,12 +151,10 @@ class Client(fl.client.NumPyClient):
             epochs=args.epochs_per_subset
         )
         epochs += args.epochs_per_subset
-        time_elapsed = time.time() - start
         
         # Calculate evaluation metric
         train_accuracy = float(history.history["accuracy"][-1])
         results = { "accuracy": train_accuracy, }
-        print(f"{results} | time_elapsed: {time_elapsed:.2f}s")
 
         # Get the parameters after training
         parameters_prime = model.get_model().get_weights()
@@ -179,19 +166,18 @@ class Client(fl.client.NumPyClient):
     def evaluate(self, parameters, config=None):
         
         global epochs
-
         # Set the weights of the model
         model.get_model().set_weights(parameters)
         # Evaluate the model and get the loss and accuracy
         loss, eval_accuracy = model.get_model().evaluate(
             self.test_images, self.test_labels, batch_size=self.args.batch_size
         )
-        
+
         diagnostic_data = [epochs, loss, eval_accuracy, train_accuracy]
-        with open(f'{CLIENT_FOLDER}/data.json', 'r', encoding='utf-8') as f:
+        with open(JSON_PATH, 'r', encoding='utf-8') as f:
             df = json.load(f)
             df.append(diagnostic_data)
-        with open(f'{CLIENT_FOLDER}/data.json', 'w', encoding='utf-8') as f:
+        with open(JSON_PATH, 'w', encoding='utf-8') as f:
             json.dump(df, f, ensure_ascii=False, indent=4)
 
         # Return the loss, the number of examples evaluated on and the accuracy
@@ -201,8 +187,8 @@ class Client(fl.client.NumPyClient):
 # Function to Start the Client
 def start_fl_client():
     try:
-        with open(f'{CLIENT_FOLDER}/data.json', 'w', encoding='utf-8') as f:
-            json.dump([], f, ensure_ascii=False, indent=4)
+        with open(JSON_PATH, 'w', encoding='utf-8') as f:
+            json.dump([args.__dict__], f, ensure_ascii=False, indent=4)
         client = Client(args).to_client()
         fl.client.start_client(server_address=args.server_address, client=client)
     except Exception as e:
@@ -212,35 +198,27 @@ def start_fl_client():
 
 if __name__ == "__main__":
 
-    time_elapsed: float = 0
-    threshold: float = 0.5
-    train_accuracy: float = 0
-    accuracy: float = 0
-    iterations: int = 0
-    start = time.time()
-    epochs = 0
+    # Model
+    num_classes = 20 if COARSE_LEARNING else 100
+    model = Model(
+        learning_rate=args.learning_rate, 
+        classes_=num_classes,
+        alpha_=args.alpha,
+        scale_input=args.scale
+    )
+    model.compile()
 
-    # Call the function to start the client
+    # Learning
     if LOCAL_LEARNING:
-
+        with open(f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.json', 'w', encoding='utf-8') as f:
+            json.dump([args.__dict__], f, ensure_ascii=False, indent=4)
         c = Client(args)
         params = c.get_parameters()
-
-        with open('results/data.json', 'w', encoding='utf-8') as f:
-            json.dump([], f, ensure_ascii=False, indent=4)
-
+        epochs = 0
         while epochs <= args.total_epochs:
             params, num_examples, results = c.fit(params)
             epochs += args.epochs_per_subset
-            loss, _, accuracy = c.evaluate(params)
-            accuracy = accuracy['accuracy']
-            iterations += 1
-            time_elapsed = time.time() - start
-            print(f"{results=} | evaluation {accuracy=} | {train_accuracy=} | {iterations=} | {time_elapsed:.2f}s")
-            
-        print(f'Time elapsed: {time_elapsed}\nIterations: {iterations}')
-
+            c.evaluate(params)
+            updatePlot(mode="solo", data_path=JSON_PATH)
     else:
         start_fl_client()
-
-

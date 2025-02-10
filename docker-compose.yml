@@ -97,7 +97,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_ubuntu
-    command: python client.py --data-percentage=0.1 --learning_rate=0.0016 --batch_size=32 --server_address=server:8080 --flask_address=172.19.0.5 --client_id=1 --total_clients=3 --local=False
+    command: python client.py --epochs-per-subset=1 --data-percentage=0.1 --learning_rate=0.0016 --batch_size=32 --server_address=server:8080 --flask_address=172.19.0.5 --client_id=1 --total_clients=3 
     deploy:
       resources:
         limits:
@@ -122,7 +122,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_arch
-    command: /bin/bash -c 'source /home/corvuvr/.venv/bin/activate && cd /app && python client.py --data-percentage=0.1 --learning_rate=0.0016 --batch_size=32 --server_address=server:8080 --flask_address=172.19.0.5 --client_id=2 --total_clients=3 --local=False'
+    command: /bin/bash -c 'source /home/corvuvr/.venv/bin/activate && cd /app && python client.py --epochs-per-subset=1 --data-percentage=0.1 --learning_rate=0.0016 --batch_size=32 --server_address=server:8080 --flask_address=172.19.0.5 --client_id=2 --total_clients=3 '
     deploy:
       resources:
         limits:
@@ -147,7 +147,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_tensorflow
-    command: python client.py --learning_rate=0.0016 --data-percentage=0.1 --batch_size=32 --client_id=3 --total_clients=3 --server_address=server:8080 --flask_address=172.19.0.5 --local=False
+    command: python client.py --epochs-per-subset=1 --learning_rate=0.0016 --data-percentage=0.1 --batch_size=32 --client_id=3 --total_clients=3 --server_address=server:8080 --flask_address=172.19.0.5 
     deploy:
       resources:
         # reservations:

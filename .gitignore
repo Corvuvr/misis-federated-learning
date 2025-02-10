@@ -14,13 +14,8 @@ __pycache__/
 *.csv
 
 # ignore runtime artifacts
-results/**/*.json
-results/**/*.h5
-results/**/~*
+results/*.json
+results/*.png
+results/*.h5
+results/~*
 metrics/*
-# ignore cifar10-related code
-10
-
-# ignore non-federated learning code
-client-solo.py
-docker-compose.solo.yml
