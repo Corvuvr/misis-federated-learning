@@ -14,7 +14,7 @@ import flwr as fl
 
 from prometheus_client import Gauge, start_http_server
 from strategy.strategy import FedCustom
-
+from helpers.plots import updatePlot
 from flask import Flask, request, send_file
 
 RESIZE_DATA: bool = False
@@ -119,7 +119,7 @@ def load_data_proxy():
 
     # Save data to zip
     data = (partition_image_metadata, partition_images, partition_fine_labels, partition_coarse_labels)
-    workdir = "/results/"
+    workdir = "/data/"
     zip_filename = f"~data{client_id}.zip"
     zip_filepath = f"{workdir}{zip_filename}"
     zip = zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED)
@@ -168,4 +168,5 @@ if __name__ == "__main__":
     start_fl_server(strategy=strategy_instance, rounds=args.number_of_rounds)
     print(f'{total_clients=}')
 
+    updatePlot(mode="fed", data_path='/results')
     thread.join()

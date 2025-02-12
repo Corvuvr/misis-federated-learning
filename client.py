@@ -207,7 +207,8 @@ if __name__ == "__main__":
         scale_input=args.scale
     )
     model.compile()
-    epochs = 0
+    epochs: int = 0
+    train_accuracy: float = 0
     # Learning
     if LOCAL_LEARNING:
         with open(f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.json', 'w', encoding='utf-8') as f:

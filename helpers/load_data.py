@@ -14,11 +14,9 @@ def shuffle(percentage, args):
     the_len = len(next(it))
     if not all(len(l) == the_len for l in it):
         raise ValueError('ERROR: lists are not of the same length!')
-    db()
     # Apply data sampling
     num_samples = int(percentage * len(args[0]))
     indices = np.random.choice(len(args[0]), num_samples, replace=False)
-    db()
     for arg in args:
         yield arg[indices]
 

@@ -76,7 +76,8 @@ services:
     volumes:
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./results/server:/results
+      - ./results/server:/data
+      - ./results:/results
     ports:
       - "6000:6000"
       - "7272:7272"
