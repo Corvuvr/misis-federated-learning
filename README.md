@@ -15,4 +15,4 @@ docker compose up
 После запуска открыть в браузере: `localhost:3000` - на странице появится интерфейс Graphana с информацией для мониторинга. 
 
 ## Запуск (локально)
-См. ![пример](examples/client-solo.ipynb).
+См. [пример](examples/client-solo.ipynb).
