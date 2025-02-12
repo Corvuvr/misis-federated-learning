@@ -7,12 +7,9 @@ from pathlib import Path
 from matplotlib import ticker
 from matplotlib import pyplot as plt
 
-CLIENT_FOLDER = "results"
-PLOTS_FOLDER = 'plots'
-
 def single_client(data_path):
     
-    with open(data_path, 'r', encoding='utf-8') as f:
+    with open(f'{data_path}/client-solo.json', 'r', encoding='utf-8') as f:
         df = np.array(json.load(f)[1:]).astype('float32')
         (epochs, loss, eval_accuracy, train_accuracy) = df.transpose()
     fig = plt.figure()
@@ -22,15 +19,21 @@ def single_client(data_path):
     plt.xlabel("Количество эпох")
     plt.ylabel("Точность")
     plt.title("Динамика обучения локальной модели: точность")
-    plt.savefig(f'{Path(data_path).parent}/client-solo-acc.png', dpi=fig.dpi)
+    filename = f'{data_path}/client-solo-acc.png'
+    plt.savefig(filename, dpi=fig.dpi)
+    print(f"LOG: Saved Plot in: {filename}")
     plt.clf()
     
     plt.plot(epochs, loss)
     plt.xlabel("Количество эпох")
     plt.ylabel("Loss-функция")
     plt.title("Динамика обучения локальной модели: функция ошибки")
-    plt.savefig(f'{Path(data_path).parent}/client-solo-loss.png', dpi=fig.dpi)
+    filename = f'{data_path}/client-solo-loss.png'
+    plt.savefig(filename, dpi=fig.dpi)
+    print(f"LOG: Saved Plot in: {filename}")
     plt.clf()
+
+    print(list(os.walk(data_path)))
 
 def federated_clients(data_path):
     print("LOG: Making Plots...")
@@ -78,10 +81,6 @@ def plotFedData(data, columns, filename: str):
     plt.savefig(filename)
     print(f"LOG: Saved Plot in: {filename}")
     plt.clf()
-
-def substitute_labels_with_step(labels, step):
-    new_labels = ...
-    return new_labels
 
 def updatePlot(mode: str = "solo", data_path: str = "."):
     if mode=="solo":

@@ -221,6 +221,7 @@ if __name__ == "__main__":
             params, num_examples, results = c.fit(params)
             epochs += args.epochs_per_subset
             c.evaluate(params)
-            updatePlot(mode="solo", data_path=JSON_PATH)
+
+        updatePlot(mode="solo", data_path=CLIENT_FOLDER)
     else:
         start_fl_client()
