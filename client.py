@@ -173,7 +173,7 @@ class Client(fl.client.NumPyClient):
             self.test_images, self.test_labels, batch_size=self.args.batch_size
         )
 
-        diagnostic_data = [epochs, loss, eval_accuracy, train_accuracy]
+        diagnostic_data = [epochs, float(loss), float(eval_accuracy), float(train_accuracy)]
         with open(JSON_PATH, 'r', encoding='utf-8') as f:
             df = json.load(f)
             df.append(diagnostic_data)

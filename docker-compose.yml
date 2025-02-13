@@ -98,9 +98,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_ubuntu
-    command: python client.py --epochs-per-subset=1 --data-percentage=0.1 --learning_rate=0.0016 --batch_size=32 --server_address=server:8080 --flask_address=172.19.0.5 --client_id=1 --total_clients=3 
+    command: python client.py --epochs-per-subset=10 --total-epochs=1500 --data-percentage=0.1 --learning_rate=0.0016 --batch_size=32 --server_address=server:8080 --flask_address=172.19.0.5 --client_id=1 --total_clients=3 
     deploy:
       resources:
+        # reservations:
+        #   devices:
+        #     - driver: nvidia
+        #       count: all
+        #       capabilities: [gpu]
         limits:
           cpus: "1"
           memory: "7g"
@@ -123,9 +128,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_arch
-    command: /bin/bash -c 'source /home/corvuvr/.venv/bin/activate && cd /app && python client.py --epochs-per-subset=1 --data-percentage=0.1 --learning_rate=0.0016 --batch_size=32 --server_address=server:8080 --flask_address=172.19.0.5 --client_id=2 --total_clients=3'
+    command: /bin/bash -c 'source /home/corvuvr/.venv/bin/activate && cd /app && python client.py --epochs-per-subset=10 --total-epochs=1500  --data-percentage=0.1 --learning_rate=0.0016 --batch_size=32 --server_address=server:8080 --flask_address=172.19.0.5 --client_id=2 --total_clients=3'
     deploy:
       resources:
+        # reservations:
+        #   devices:
+        #     - driver: nvidia
+        #       count: all
+        #       capabilities: [gpu]
         limits:
           cpus: "1"
           memory: "7g"
@@ -148,14 +158,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_tensorflow
-    command: python client.py --epochs-per-subset=1 --learning_rate=0.0016 --data-percentage=0.1 --batch_size=32 --client_id=3 --total_clients=3 --server_address=server:8080 --flask_address=172.19.0.5 
+    command: python client.py --epochs-per-subset=10 --total-epochs=1500 --learning_rate=0.0016 --data-percentage=0.1 --batch_size=32 --client_id=3 --total_clients=3 --server_address=server:8080 --flask_address=172.19.0.5 
     deploy:
       resources:
         # reservations:
-          # devices:
-          #   - driver: nvidia
-          #     count: all
-          #     capabilities: [gpu]
+        #   devices:
+        #     - driver: nvidia
+        #       count: all
+        #       capabilities: [gpu]
         limits:
           cpus: "2"
           memory: "7g"
