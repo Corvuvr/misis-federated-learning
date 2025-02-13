@@ -12,15 +12,19 @@ from model.model import Model
 from helpers.plots import updatePlot
 from helpers.load_data import load_data, load_data_local, shuffle
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+print(tf.config.list_physical_devices('GPU'))
+print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="Flower client")
 
 # Common args
 parser.add_argument(
-    "--batch_size", type=int, default=32, help="Batch size for training"
+    "--batch-size", type=int, default=32, help="Batch size for training"
 )
 parser.add_argument(
-    "--learning_rate", type=float, default=0.1, help="Learning rate for the optimizer"
+    "--learning-rate", type=float, default=0.1, help="Learning rate for the optimizer"
 )
 parser.add_argument(
     "--data-percentage", type=float, default=0.5, help="Portion of client data to use"
@@ -43,16 +47,16 @@ parser.add_argument(
 
 # Fed args
 parser.add_argument(
-    "--server_address", type=str, default="server:8080", help="Address of the fed server"
+    "--server-address", type=str, default="server:8080", help="Address of the fed server"
 )
 parser.add_argument(
-    "--flask_address", type=str, default="0.0.0.0", help="Address of the data server"
+    "--flask-address", type=str, default="0.0.0.0", help="Address of the data server"
 )
 parser.add_argument(
-    "--client_id", type=int, default=1, help="Unique ID for the client"
+    "--client-id", type=int, default=1, help="Unique ID for the client"
 )
 parser.add_argument(
-    "--total_clients", type=int, default=2, help="Total number of clients"
+    "--total-clients", type=int, default=2, help="Total number of clients"
 )
 
 # Local args

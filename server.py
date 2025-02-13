@@ -32,13 +32,13 @@ loss_gauge = Gauge("model_loss", "Current loss of the global model")
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="Flower Server")
 parser.add_argument(
-    "--number_of_rounds",
+    "--number-of-rounds",
     type=int,
     default=100,
     help="Number of FL rounds (default: 100)",
 )
 parser.add_argument(
-    "--flask_address", type=str, default="0.0.0.0", help="Address of the data server"
+    "--flask-address", type=str, default="0.0.0.0", help="Address of the data server"
 )
 args = parser.parse_args()
 
