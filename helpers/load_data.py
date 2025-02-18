@@ -2,6 +2,8 @@ import io
 import logging
 import zipfile
 import requests
+import datasets
+
 import numpy as np
 import tensorflow as tf
 from flwr_datasets import FederatedDataset
@@ -23,20 +25,41 @@ def shuffle(percentage, args):
 def load_data_local(train_split: float = 0.5, scale_factor: int = 1):
     
     # Download dataset
-    fds = FederatedDataset(dataset="cifar100", partitioners={"train": 1})
-    data = fds.load_partition(0, "train")
-    data.set_format("numpy")
+    clients = 2
+    fds = FederatedDataset(dataset="cifar100", partitioners={"train": clients})
 
-    # Divide data on each client:
-    partition = data.train_test_split(test_size=1-train_split, seed=42)
-    x_train, y_train, z_train = \
-        partition["train"]["img"] / 255.0, \
-        partition["train"]["fine_label"], \
-        partition["train"]["coarse_label"]
-    x_test, y_test, z_test = \
-        partition["test"]["img"] / 255.0, \
-        partition["test"]["fine_label"], \
-        partition["test"]["coarse_label"]
+    column_names = ["train", "test"]
+
+    x_train = y_train = z_train = \
+        x_test = y_test = z_test = np.array([])
+    # x_test = y_test = z_test = np.array([])
+    
+    for i in range(clients):
+
+            data: dict = fds.load_partition(i, "train")
+            data.set_format("numpy")
+            partition = data.train_test_split(test_size=1-train_split, seed=42)
+            
+            for name in column_names:
+                x_tmp = partition[name]["img"] / 255.0
+                y_tmp = partition[name]["fine_label"] 
+                z_tmp = partition[name]["coarse_label"]
+      
+                if name == column_names[0]:
+                    if x_train.any():
+                        x_train = np.concatenate((x_tmp,  x_train), axis=0)
+                        y_train = np.concatenate((y_tmp,  y_train), axis=0)
+                        z_train = np.concatenate((z_tmp,  z_train), axis=0)
+                    else:
+                        x_train, y_train, z_train = x_tmp, y_tmp, z_tmp
+                elif name == column_names[1]:
+                    if x_test.any():
+                        x_test = np.concatenate((x_tmp,  x_test), axis=0)
+                        y_test = np.concatenate((y_tmp,  y_test), axis=0)
+                        z_test = np.concatenate((z_tmp,  z_test), axis=0)
+                    else:
+                        x_test, y_test, z_test = x_tmp, y_tmp, z_tmp
+
     # Scale
     x_train, x_test = scale_input(scale=scale_factor, args=(x_train, x_test))
     return (x_train, y_train, z_train), (x_test, y_test, z_test)

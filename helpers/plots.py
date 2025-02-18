@@ -9,7 +9,9 @@ from matplotlib import pyplot as plt
 
 def single_client(data_path):
     
-    with open(f'{data_path}/client-solo.json', 'r', encoding='utf-8') as f:
+    json_filename = f'{data_path}/client-solo.json'
+    
+    with open(json_filename, 'r', encoding='utf-8') as f:
         df = np.array(json.load(f)[1:]).astype('float32')
         (epochs, loss, eval_accuracy, train_accuracy) = df.transpose()
     fig = plt.figure()
@@ -19,21 +21,38 @@ def single_client(data_path):
     plt.xlabel("Количество эпох")
     plt.ylabel("Точность")
     plt.title("Динамика обучения локальной модели: точность")
-    filename = f'{data_path}/client-solo-acc.png'
-    plt.savefig(filename, dpi=fig.dpi)
-    print(f"LOG: Saved Plot in: {filename}")
+    acc_filename = f'{data_path}/client-solo-acc.png'
+    plt.savefig(acc_filename, dpi=fig.dpi)
+    print(f"LOG: Saved Plot in: {acc_filename}")
     plt.clf()
     
     plt.plot(epochs, loss)
     plt.xlabel("Количество эпох")
     plt.ylabel("Loss-функция")
     plt.title("Динамика обучения локальной модели: функция ошибки")
-    filename = f'{data_path}/client-solo-loss.png'
-    plt.savefig(filename, dpi=fig.dpi)
-    print(f"LOG: Saved Plot in: {filename}")
+    loss_filename = f'{data_path}/client-solo-loss.png'
+    plt.savefig(loss_filename, dpi=fig.dpi)
+    print(f"LOG: Saved Plot in: {loss_filename}")
     plt.clf()
 
     print(list(os.walk(data_path)))
+
+    import datetime
+    directory_name = f'{data_path}/{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}' 
+    try:
+        os.mkdir(directory_name)
+        print(f"Directory '{directory_name}' created successfully.")
+        import shutil
+        shutil.copy(acc_filename, directory_name)
+        shutil.copy(loss_filename, directory_name)
+        shutil.copy(json_filename, directory_name)
+    except FileExistsError:
+        print(f"Directory '{directory_name}' already exists.")
+    except PermissionError:
+        print(f"Permission denied: Unable to create '{directory_name}'.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
 
 def federated_clients(data_path):
     print("LOG: Making Plots...")

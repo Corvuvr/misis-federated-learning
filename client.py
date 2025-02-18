@@ -14,7 +14,13 @@ from helpers.load_data import load_data, load_data_local, shuffle
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 print(tf.config.list_physical_devices('GPU'))
-print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024*4)])
+    except RuntimeError as e:
+        print(e)
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="Flower client")
@@ -103,7 +109,7 @@ class Client(fl.client.NumPyClient):
             scale_factor = args.scale, 
             server_ip=args.flask_address
         ) if not LOCAL_LEARNING else load_data_local(
-            train_split=self.args.data_percentage,
+            train_split=args.train_split,
             scale_factor=self.args.scale
         )
 
@@ -220,10 +226,9 @@ if __name__ == "__main__":
         c = Client(args)
         params = c.get_parameters()
         
-        while epochs <= args.total_epochs:
+        while epochs < args.total_epochs:
             print(f"Epoch {epochs}...")
             params, num_examples, results = c.fit(params)
-            epochs += args.epochs_per_subset
             c.evaluate(params)
 
         updatePlot(mode="solo", data_path=CLIENT_FOLDER)

@@ -17,5 +17,8 @@ __pycache__/
 results/*.json
 results/*.png
 results/*.h5
-results/**/~*
+results/**/*
 metrics/*
+.venv/*
+
+!results/README.md
