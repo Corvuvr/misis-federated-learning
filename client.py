@@ -18,7 +18,8 @@ print(tf.config.list_physical_devices('GPU'))
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
     try:
-        tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024*4)])
+        # tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024*4)])
+        tf.config.experimental.set_memory_growth(gpus[0], True)
     except RuntimeError as e:
         print(e)
 
@@ -103,7 +104,7 @@ class Client(fl.client.NumPyClient):
         self.args = args
 
         logger.info("Preparing data...")
-        (x_train, y_train, z_train), (x_test, y_test, z_test) = load_data(
+        (self.train_images, y_train, z_train), (self.test_images, y_test, z_test) = load_data(
             client_id=self.args.client_id,
             train_split = args.train_split, 
             scale_factor = args.scale, 
@@ -112,20 +113,8 @@ class Client(fl.client.NumPyClient):
             train_split=args.train_split,
             scale_factor=self.args.scale
         )
-
-        self.x_train = x_train # img
-        self.y_train = y_train # fine_label - 100 classes
-        self.z_train = z_train # coarse label - 20 superclasses
-        self.x_test = x_test
-        self.y_test = y_test
-        self.z_test = z_test
-
-        self.train_images = x_train
+        # print(f'{self.train_images.shape=}')
         self.train_labels = z_train if COARSE_LEARNING else y_train
-
-        print(f'{self.train_images.shape=}')
-        
-        self.test_images = x_test
         self.test_labels = z_test if COARSE_LEARNING else y_test
 
     def get_parameters(self, config=None):
@@ -139,13 +128,12 @@ class Client(fl.client.NumPyClient):
         # Set the weights of the model
         model.get_model().set_weights(parameters)
 
-        scaled_images = list(scale_input(scale=args.scale, args=(self.train_images,)))
-
         # Get training subset
         train_images, train_labels = shuffle(
             percentage=args.data_percentage,
-            args=(scaled_images[0], self.train_labels)
+            args=(self.train_images, self.train_labels)
         )
+        train_images = list(scale_input(scale=args.scale, args=(train_images,)))
 
         # Add a callback that saves weights
         cp_callback = tf.keras.callbacks.ModelCheckpoint(
@@ -156,7 +144,7 @@ class Client(fl.client.NumPyClient):
 
         # Train the model
         history = model.get_model().fit(
-            train_images,
+            train_images[0],
             train_labels, 
             batch_size=self.args.batch_size, 
             callbacks=[cp_callback], 
@@ -172,7 +160,7 @@ class Client(fl.client.NumPyClient):
         parameters_prime = model.get_model().get_weights()
 
         # Directly return the parameters and the number of examples trained on
-        return parameters_prime, len(self.x_train), results
+        return parameters_prime, len(self.train_images), results
 
 
     def evaluate(self, parameters, config=None):
@@ -181,9 +169,9 @@ class Client(fl.client.NumPyClient):
         # Set the weights of the model
         model.get_model().set_weights(parameters)
         # Evaluate the model and get the loss and accuracy
-        scaled_images = list(scale_input(scale=args.scale, args=(self.test_images,)))
+        test_images = list(scale_input(scale=args.scale, args=(self.test_images,)))
         loss, eval_accuracy = model.get_model().evaluate(
-            scaled_images[0], self.test_labels, batch_size=self.args.batch_size
+            test_images[0], self.test_labels, batch_size=self.args.batch_size
         )
 
         diagnostic_data = [epochs, float(loss), float(eval_accuracy), float(train_accuracy)]
@@ -194,7 +182,7 @@ class Client(fl.client.NumPyClient):
             json.dump(df, f, ensure_ascii=False, indent=4)
 
         # Return the loss, the number of examples evaluated on and the accuracy
-        return float(loss), len(self.x_test), {"accuracy": float(eval_accuracy)}
+        return float(loss), len(self.test_images), {"accuracy": float(eval_accuracy)}
 
 
 # Function to Start the Client

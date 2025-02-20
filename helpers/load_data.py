@@ -59,8 +59,6 @@ def load_data_local(train_split: float = 0.5, scale_factor: int = 1):
                     else:
                         x_test, y_test, z_test = x_tmp, y_tmp, z_tmp
 
-    # Scale
-    # x_train, x_test = scale_input(scale=scale_factor, args=(x_train, x_test))
     return (x_train, y_train, z_train), (x_test, y_test, z_test)
 
 def load_data(client_id: int, train_split: float = 0.5, scale_factor: int = 1, server_ip: str = "0.0.0.0"):
