@@ -10,7 +10,7 @@ import tensorflow as tf
 
 from model.model import Model
 from helpers.plots import updatePlot
-from helpers.load_data import load_data, load_data_local, shuffle
+from helpers.load_data import load_data, load_data_local, shuffle, scale_input
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 print(tf.config.list_physical_devices('GPU'))
@@ -139,10 +139,12 @@ class Client(fl.client.NumPyClient):
         # Set the weights of the model
         model.get_model().set_weights(parameters)
 
+        scaled_images = list(scale_input(scale=args.scale, args=(self.train_images,)))
+
         # Get training subset
         train_images, train_labels = shuffle(
             percentage=args.data_percentage,
-            args=(self.train_images, self.train_labels)
+            args=(scaled_images[0], self.train_labels)
         )
 
         # Add a callback that saves weights
@@ -179,8 +181,9 @@ class Client(fl.client.NumPyClient):
         # Set the weights of the model
         model.get_model().set_weights(parameters)
         # Evaluate the model and get the loss and accuracy
+        scaled_images = list(scale_input(scale=args.scale, args=(self.test_images,)))
         loss, eval_accuracy = model.get_model().evaluate(
-            self.test_images, self.test_labels, batch_size=self.args.batch_size
+            scaled_images[0], self.test_labels, batch_size=self.args.batch_size
         )
 
         diagnostic_data = [epochs, float(loss), float(eval_accuracy), float(train_accuracy)]

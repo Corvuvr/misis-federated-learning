@@ -32,7 +32,6 @@ def load_data_local(train_split: float = 0.5, scale_factor: int = 1):
 
     x_train = y_train = z_train = \
         x_test = y_test = z_test = np.array([])
-    # x_test = y_test = z_test = np.array([])
     
     for i in range(clients):
 
@@ -61,7 +60,7 @@ def load_data_local(train_split: float = 0.5, scale_factor: int = 1):
                         x_test, y_test, z_test = x_tmp, y_tmp, z_tmp
 
     # Scale
-    x_train, x_test = scale_input(scale=scale_factor, args=(x_train, x_test))
+    # x_train, x_test = scale_input(scale=scale_factor, args=(x_train, x_test))
     return (x_train, y_train, z_train), (x_test, y_test, z_test)
 
 def load_data(client_id: int, train_split: float = 0.5, scale_factor: int = 1, server_ip: str = "0.0.0.0"):
@@ -108,10 +107,7 @@ def load_data(client_id: int, train_split: float = 0.5, scale_factor: int = 1, s
 
 def scale_input(args, scale: int = 1):
     for arg in args:
-        yield np.resize(
-            arg, 
-            (arg.shape[0], arg.shape[1]*scale, arg.shape[2]*scale, arg.shape[3])
-        )
+        yield np.array(arg).repeat(scale, axis=1).repeat(scale, axis=2)
 
 class db:
     count = 0
