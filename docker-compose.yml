@@ -67,8 +67,8 @@ services:
     container_name: server
     build:
       context: .
-      dockerfile: Dockerfile_ubuntu
-    command: python server.py --number-of-rounds=500 --flask-address=172.19.0.5
+      dockerfile: Dockerfile_server
+    command: python server.py --number-of-rounds=${NUM_ROUNDS} --flask-address=${FLASK_ADDRESS}
     environment:
       PYTHONUNBUFFERED: 1
       FLASK_RUN_PORT: 6000
@@ -98,17 +98,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_ubuntu
-    command: python client.py --epochs-per-subset=10 --total-epochs=1500 --data-percentage=0.1 --learning-rate=0.0016 --batch-size=32 --server-address=server:8080 --flask-address=172.19.0.5 --client-id=1 --total-clients=3 
+    command: python client.py ${COMMON_CLIENT_PROPERTIES} --flask-address=${FLASK_ADDRESS} --client-id=1 --total-clients=3 
     deploy:
       resources:
-        # reservations:
-        #   devices:
-        #     - driver: nvidia
-        #       count: all
-        #       capabilities: [gpu]
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
         limits:
           cpus: "1"
-          memory: "7g"
+          memory: "10g"
+    memswap_limit: 16G
     volumes:
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
@@ -121,24 +122,27 @@ services:
       FLASK_RUN_PORT: 6001
       container_name: client1
       DOCKER_HOST_IP: host.docker.internal
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     stop_signal: SIGINT
   
   client2:
     container_name: client2
     build:
       context: .
-      dockerfile: Dockerfile_arch
-    command: /bin/bash -c 'source /home/corvuvr/.venv/bin/activate && cd /app && python client.py --epochs-per-subset=10 --total-epochs=1500  --data-percentage=0.1 --learning-rate=0.0016 --batch-size=32 --server-address=server:8080 --flask-address=172.19.0.5 --client-id=2 --total-clients=3'
+      dockerfile: Dockerfile_ubuntu
+    command: python client.py ${COMMON_CLIENT_PROPERTIES} --flask-address=${FLASK_ADDRESS} --client-id=2 --total-clients=3
     deploy:
       resources:
-        # reservations:
-        #   devices:
-        #     - driver: nvidia
-        #       count: all
-        #       capabilities: [gpu]
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
         limits:
           cpus: "1"
-          memory: "7g"
+          memory: "10g"
+    memswap_limit: 16G
     volumes:
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
@@ -148,6 +152,10 @@ services:
     depends_on:
       - server
     environment:
+      CUDNN_PATH: /usr/local/lib/python3.11/site-packages/nvidia/cudnn
+      LD_LIBRARY_PATH: $CUDNN_PATH/lib:$LD_LIBRARY_PATH
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
       FLASK_RUN_PORT: 6002
       container_name: client2
       DOCKER_HOST_IP: host.docker.internal
@@ -157,18 +165,19 @@ services:
     container_name: client3
     build:
       context: .
-      dockerfile: Dockerfile_tensorflow
-    command: python client.py --epochs-per-subset=10 --total-epochs=1500 --learning-rate=0.0016 --data-percentage=0.1 --batch-size=32 --client-id=3 --total-clients=3 --server-address=server:8080 --flask-address=172.19.0.5 
+      dockerfile: Dockerfile_ubuntu
+    command: python client.py ${COMMON_CLIENT_PROPERTIES} --flask-address=${FLASK_ADDRESS} --client-id=3 --total-clients=3
     deploy:
       resources:
-        # reservations:
-        #   devices:
-        #     - driver: nvidia
-        #       count: all
-        #       capabilities: [gpu]
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
         limits:
           cpus: "2"
-          memory: "7g"
+          memory: "10g"
+    memswap_limit: 16G
     volumes:
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
@@ -182,6 +191,8 @@ services:
       FLASK_RUN_PORT: 6003
       container_name: client3
       DOCKER_HOST_IP: host.docker.internal
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     stop_signal: SIGINT
 
 volumes:

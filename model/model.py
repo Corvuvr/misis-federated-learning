@@ -1,4 +1,5 @@
 import tensorflow as tf
+# from tensorflow.keras.layers import Input, Resizing
 
 # Class for the model. In this case, we are using the MobileNetV2 model from Keras
 class Model:
@@ -6,15 +7,28 @@ class Model:
         self.learning_rate = learning_rate
         self.loss_function = tf.keras.losses.SparseCategoricalCrossentropy()
 
-        input_shape = [32, 32, 3]
+        init_shape = (32, 32, 3)
+        input_shape = list(init_shape)
         input_shape[0] *= scale_input
         input_shape[1] *= scale_input
         input_shape=tuple(input_shape)
 
-        print(f'{input_shape}')
-        self.model = tf.keras.applications.MobileNetV2(
-            input_shape, classes=classes_, alpha=alpha_, weights=None
+        input_layer = tf.keras.layers.Input(shape=init_shape)
+        resized_layer = tf.keras.layers.Resizing(32*scale_input, 32*scale_input)(input_layer)
+
+        base_model = tf.keras.applications.MobileNetV2(
+            input_tensor=resized_layer,
+            include_top=False,
+            classes=classes_, 
+            alpha=alpha_, 
+            weights=None
         )
+        x = tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
+        x = tf.keras.layers.Dense(200, activation='relu')(x)
+        x = tf.keras.layers.Dense(100, activation='softmax')(x)
+        self.model = tf.keras.models.Model(inputs=base_model.input, outputs=x)
+
+        self.model.summary()
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
 
     def compile(self):

@@ -1,24 +1,28 @@
-# ignore __pycache__ directories
-__pycache__/
+# Exclude everything except project files
+*
+!config/*
+!examples/*
+!model/*
+!results/*
+!helpers/*
+!strategy/*
+!client.py
+!server.py
+!Dockerfile*
+!requirments.txt
+!results/README.md
 
-# ignore .pyc files
-*.pyc
-
-# ignore .vscode directory
-.vscode/
-
-# ignore .npz files
-*.npz
-
-# ignore .csv files
-*.csv
-
-# ignore runtime artifacts
+# Ignore runtime artifacts in project files
 results/*.json
 results/*.png
 results/*.h5
 results/**/*
-metrics/*
 .venv/*
 
-!results/README.md
+# Ignore cache
+__pycache__/
+*.pyc
+.vscode/
+*.npz
+*.csv
+*.run

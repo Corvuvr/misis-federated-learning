@@ -12,16 +12,22 @@ from model.model import Model
 from helpers.plots import updatePlot
 from helpers.load_data import load_data, load_data_local, shuffle, scale_input
 
+# Logs
+logging.basicConfig(level=logging.INFO)     # Configure logging
+logger = logging.getLogger(__name__)        # Create logger for the module
+# os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"    # Make TensorFlow log less verbose
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "0"    # Make TensorFlow log less verbose
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-print(tf.config.list_physical_devices('GPU'))
+
+logger.info(f"GPUS:\t{tf.config.list_physical_devices('GPU')}")
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
     try:
-        # tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024*4)])
-        tf.config.experimental.set_memory_growth(gpus[0], True)
+        tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024*3)])
+        #tf.config.experimental.set_memory_growth(gpus[0], True)
     except RuntimeError as e:
-        print(e)
+        logger.error(e)
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="Flower client")
@@ -51,7 +57,9 @@ parser.add_argument(
 parser.add_argument(
     "--train-split", type=float, default=0.5, help="In which proportion split partition"
 )
-
+parser.add_argument(
+    "--coarse", default=False, action='store_true', help="Whether to train on fine (superclass) labels or coarse (class) labels"
+)
 # Fed args
 parser.add_argument(
     "--server-address", type=str, default="server:8080", help="Address of the fed server"
@@ -72,11 +80,11 @@ parser.add_argument(
 )
 
 args = parser.parse_args()
-print(f'{args=}')
+logger.info(str(args))
 
 # Globals
 LOCAL_LEARNING = args.local
-COARSE_LEARNING = False
+COARSE_LEARNING = args.coarse
 CLIENT_FOLDER = "results" if LOCAL_LEARNING else "/results"
 CLIENT_PREFIX: str = str(args.client_id) if not LOCAL_LEARNING else "-solo"
 JSON_PATH = f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.json'
@@ -85,18 +93,14 @@ WEIGHTS_PATH = f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.weights.h5'
 if not LOCAL_LEARNING:
     wait_for_server: bool = True
     while wait_for_server:
-        time.sleep(1)
+        time.sleep(10)
         try:
+            logger.info("Waiting for server...")
             if requests.get(f'http://{args.flask_address}:7272/establish_connection'):
                 wait_for_server = False
         except:
-            print("Waiting for server...")
-    print(f"Connection established. Initializing client{CLIENT_PREFIX}...")
-
-# Logs
-logging.basicConfig(level=logging.INFO)     # Configure logging
-logger = logging.getLogger(__name__)        # Create logger for the module
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"    # Make TensorFlow log less verbose
+            logger.info("Waiting for server...")
+    logger.error(f"Connection established. Initializing client{CLIENT_PREFIX}...")
 
 class Client(fl.client.NumPyClient):
     def __init__(self, args):
@@ -113,18 +117,20 @@ class Client(fl.client.NumPyClient):
             train_split=args.train_split,
             scale_factor=self.args.scale
         )
-        # print(f'{self.train_images.shape=}')
         self.train_labels = z_train if COARSE_LEARNING else y_train
         self.test_labels = z_test if COARSE_LEARNING else y_test
+        logger.info(f"Got data:\t{self.train_images.shape=}\t{self.test_images.shape=}")
 
     def get_parameters(self, config=None):
         # Return the parameters of the model
         return model.get_model().get_weights()
 
     def fit(self, parameters, config=None):
+        
         global epochs
         global args
         global train_accuracy
+        
         # Set the weights of the model
         model.get_model().set_weights(parameters)
 
@@ -133,7 +139,6 @@ class Client(fl.client.NumPyClient):
             percentage=args.data_percentage,
             args=(self.train_images, self.train_labels)
         )
-        train_images = list(scale_input(scale=args.scale, args=(train_images,)))
 
         # Add a callback that saves weights
         cp_callback = tf.keras.callbacks.ModelCheckpoint(
@@ -144,7 +149,7 @@ class Client(fl.client.NumPyClient):
 
         # Train the model
         history = model.get_model().fit(
-            train_images[0],
+            train_images,
             train_labels, 
             batch_size=self.args.batch_size, 
             callbacks=[cp_callback], 
@@ -169,9 +174,8 @@ class Client(fl.client.NumPyClient):
         # Set the weights of the model
         model.get_model().set_weights(parameters)
         # Evaluate the model and get the loss and accuracy
-        test_images = list(scale_input(scale=args.scale, args=(self.test_images,)))
         loss, eval_accuracy = model.get_model().evaluate(
-            test_images[0], self.test_labels, batch_size=self.args.batch_size
+            self.test_images, self.test_labels, batch_size=self.args.batch_size
         )
 
         diagnostic_data = [epochs, float(loss), float(eval_accuracy), float(train_accuracy)]
@@ -218,7 +222,7 @@ if __name__ == "__main__":
         params = c.get_parameters()
         
         while epochs < args.total_epochs:
-            print(f"Epoch {epochs}...")
+            logger.info(f"Epoch {epochs}...")
             params, num_examples, results = c.fit(params)
             c.evaluate(params)
 

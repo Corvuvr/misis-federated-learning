@@ -8,7 +8,7 @@ RUN pacman -Syu \
     pkg-config \
     hdf5 \
     tree \
-    # python \
+    sudo \
     python-pip \
     git --noconfirm \
     && rm -rf /var/lib/apt/lists/*

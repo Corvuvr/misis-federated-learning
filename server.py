@@ -136,7 +136,9 @@ def load_data_proxy():
     )
 
 def run_flask_server(host='172.19.0.5', port=7272):
+    logger.info(f"Running flask at: {host}:{port}")
     dataset_sender.run(host=host, port=port)
+    
 
 # Main Function
 if __name__ == "__main__":
@@ -167,6 +169,5 @@ if __name__ == "__main__":
     # Start FL Server
     start_fl_server(strategy=strategy_instance, rounds=args.number_of_rounds)
     print(f'{total_clients=}')
-
     updatePlot(mode="fed", data_path='/results')
     thread.join()
