@@ -55,7 +55,7 @@ parser.add_argument(
     "--alpha", type=float, default=1.0, help="Parameters of the model"
 )
 parser.add_argument(
-    "--train-split", type=float, default=0.5, help="In which proportion split partition"
+    "--train-split", type=float, default=0.8, help="In which proportion split partition"
 )
 parser.add_argument(
     "--coarse", default=False, action='store_true', help="Whether to train on fine (superclass) labels or coarse (class) labels"
