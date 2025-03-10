@@ -28,7 +28,7 @@ class Model:
         x = tf.keras.layers.Dense(classes_, activation='softmax')(x)
         self.model = tf.keras.models.Model(inputs=base_model.input, outputs=x)
 
-        self.model.summary()
+        # self.model.summary()
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
 
     def compile(self):

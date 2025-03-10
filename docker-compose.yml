@@ -91,7 +91,7 @@ services:
       resources:
         limits:
           cpus: "0.3"
-          memory: "10g"
+          memory: "8g"
   
   client1:
     container_name: client1
@@ -108,7 +108,7 @@ services:
               capabilities: [gpu]
         limits:
           cpus: "1"
-          memory: "10g"
+          memory: "8g"
     memswap_limit: 16G
     volumes:
       - .:/app
@@ -141,7 +141,7 @@ services:
               capabilities: [gpu]
         limits:
           cpus: "1"
-          memory: "10g"
+          memory: "8g"
     memswap_limit: 16G
     volumes:
       - .:/app
@@ -176,7 +176,7 @@ services:
               capabilities: [gpu]
         limits:
           cpus: "2"
-          memory: "10g"
+          memory: "8g"
     memswap_limit: 16G
     volumes:
       - .:/app

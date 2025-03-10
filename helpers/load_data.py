@@ -98,8 +98,6 @@ def load_data(client_id: int, train_split: float = 0.5, scale_factor: int = 1, s
     (x_train, y_train, z_train) = images[split_point:], fine_labels[split_point:], coarse_labels[split_point:]
     (x_test, y_test, z_test) = images[:split_point], fine_labels[:split_point], coarse_labels[:split_point]
 
-    # Scale
-    x_train, x_test = scale_input(scale=scale_factor, args=(x_train, x_test))
 
     return (x_train, y_train, z_train), (x_test, y_test, z_test)
 
