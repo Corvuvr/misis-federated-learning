@@ -25,7 +25,7 @@ class Model:
         )
         x = tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
         x = tf.keras.layers.Dense(200, activation='relu')(x)
-        x = tf.keras.layers.Dense(100, activation='softmax')(x)
+        x = tf.keras.layers.Dense(classes_, activation='softmax')(x)
         self.model = tf.keras.models.Model(inputs=base_model.input, outputs=x)
 
         self.model.summary()

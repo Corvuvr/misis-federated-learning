@@ -1,5 +1,6 @@
 # Exclude everything except project files
 *
+!.env
 !config/*
 !examples/*
 !model/*
