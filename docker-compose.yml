@@ -68,7 +68,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_server
-    command: python server.py --number-of-rounds=${NUM_ROUNDS} --flask-address=${FLASK_ADDRESS}
+    command: python server.py ${SERVER_PROPERTIES}
     environment:
       PYTHONUNBUFFERED: 1
       FLASK_RUN_PORT: 6000
@@ -98,7 +98,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_ubuntu
-    command: python client.py ${COMMON_CLIENT_PROPERTIES} --flask-address=${FLASK_ADDRESS} --client-id=1 --total-clients=3 
+    command: python client.py ${COMMON_CLIENT_PROPERTIES} --flask-address=${FLASK_ADDRESS} --client-id=1
     deploy:
       resources:
         reservations:
@@ -131,7 +131,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_ubuntu
-    command: python client.py ${COMMON_CLIENT_PROPERTIES} --flask-address=${FLASK_ADDRESS} --client-id=2 --total-clients=3
+    command: python client.py ${COMMON_CLIENT_PROPERTIES} --flask-address=${FLASK_ADDRESS} --client-id=2
     deploy:
       resources:
         reservations:
@@ -161,39 +161,39 @@ services:
       DOCKER_HOST_IP: host.docker.internal
     stop_signal: SIGINT
 
-  client3:
-    container_name: client3
-    build:
-      context: .
-      dockerfile: Dockerfile_ubuntu
-    command: python client.py ${COMMON_CLIENT_PROPERTIES} --flask-address=${FLASK_ADDRESS} --client-id=3 --total-clients=3
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-        limits:
-          cpus: "2"
-          memory: "8g"
-    memswap_limit: 16G
-    volumes:
-      - .:/app
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /etc/machine-id:/etc/machine-id:ro
-      - ./results:/results
-    ports:
-      - "6003:6003"
-    depends_on:
-      - server
-    environment:
-      FLASK_RUN_PORT: 6003
-      container_name: client3
-      DOCKER_HOST_IP: host.docker.internal
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
-    stop_signal: SIGINT
+  # client3:
+  #   container_name: client3
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile_ubuntu
+  #   command: python client.py ${COMMON_CLIENT_PROPERTIES} --flask-address=${FLASK_ADDRESS} --client-id=3 --total-clients=3
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+  #       limits:
+  #         cpus: "2"
+  #         memory: "8g"
+  #   memswap_limit: 16G
+  #   volumes:
+  #     - .:/app
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - /etc/machine-id:/etc/machine-id:ro
+  #     - ./results:/results
+  #   ports:
+  #     - "6003:6003"
+  #   depends_on:
+  #     - server
+  #   environment:
+  #     FLASK_RUN_PORT: 6003
+  #     container_name: client3
+  #     DOCKER_HOST_IP: host.docker.internal
+  #     NVIDIA_VISIBLE_DEVICES: all
+  #     NVIDIA_DRIVER_CAPABILITIES: compute,utility
+  #   stop_signal: SIGINT
 
 volumes:
   grafana-storage:

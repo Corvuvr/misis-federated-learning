@@ -1,6 +1,5 @@
 import os
 import time
-import json
 import logging
 import argparse
 import requests
@@ -10,7 +9,7 @@ import tensorflow as tf
 
 from model.model import Model
 from helpers.plots import updatePlot
-from helpers.load_data import load_data, load_data_local, shuffle, scale_input
+from helpers.load_data import load_data, load_data_local, shuffle, scale_input, make_json, push_json
 
 # Logs
 logging.basicConfig(level=logging.INFO)     # Configure logging
@@ -24,7 +23,10 @@ logger.info(f"GPUS:\t{tf.config.list_physical_devices('GPU')}")
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
     try:
-        tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024*3)])
+        tf.config.experimental.set_virtual_device_configuration(
+            gpus[0], 
+            [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024*3)]
+        )
         #tf.config.experimental.set_memory_growth(gpus[0], True)
     except RuntimeError as e:
         logger.error(e)
@@ -87,7 +89,7 @@ LOCAL_LEARNING = args.local
 COARSE_LEARNING = args.coarse
 CLIENT_FOLDER = "results" if LOCAL_LEARNING else "/results"
 CLIENT_PREFIX: str = str(args.client_id) if not LOCAL_LEARNING else "-solo"
-JSON_PATH = f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.json'
+JSON_METRICS_PATH = f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.json'
 WEIGHTS_PATH = f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.weights.h5'
 
 if not LOCAL_LEARNING:
@@ -133,13 +135,14 @@ class Client(fl.client.NumPyClient):
         
         # Set the weights of the model
         model.get_model().set_weights(parameters)
-
         # Get training subset
-        train_images, train_labels = shuffle(
-            percentage=args.data_percentage,
-            args=(self.train_images, self.train_labels)
-        )
-
+        train_images, train_labels = self.train_images, self.train_labels
+        global DO_SHUFFLE
+        if DO_SHUFFLE:
+            train_images, train_labels = shuffle(
+                percentage=args.data_percentage,
+                args=(self.train_images, self.train_labels)
+            )
         # Add a callback that saves weights
         cp_callback = tf.keras.callbacks.ModelCheckpoint(
             filepath=WEIGHTS_PATH,
@@ -147,14 +150,20 @@ class Client(fl.client.NumPyClient):
             verbose=1
         )
 
+        # Early stopping after no improvement in N epochs 
+        es_callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=1)
+        
         # Train the model
         history = model.get_model().fit(
             train_images,
             train_labels, 
             batch_size=self.args.batch_size, 
-            callbacks=[cp_callback], 
+            # callbacks=[cp_callback, es_callback], 
+            callbacks=[es_callback], 
             epochs=args.epochs_per_subset
         )
+        
+        # The reason why client 1st epoch is 0?
         epochs += args.epochs_per_subset
         
         # Calculate evaluation metric
@@ -174,16 +183,21 @@ class Client(fl.client.NumPyClient):
         # Set the weights of the model
         model.get_model().set_weights(parameters)
         # Evaluate the model and get the loss and accuracy
-        loss, eval_accuracy = model.get_model().evaluate(
-            self.test_images, self.test_labels, batch_size=self.args.batch_size
-        )
+        test_images, test_labels = self.test_images, self.test_labels
+        global DO_SHUFFLE
+        if DO_SHUFFLE:
+            test_images, test_labels = shuffle(
+                percentage=args.data_percentage,
+                args=(self.test_images, self.test_labels)
+            )
 
-        diagnostic_data = [epochs, float(loss), float(eval_accuracy), float(train_accuracy)]
-        with open(JSON_PATH, 'r', encoding='utf-8') as f:
-            df = json.load(f)
-            df.append(diagnostic_data)
-        with open(JSON_PATH, 'w', encoding='utf-8') as f:
-            json.dump(df, f, ensure_ascii=False, indent=4)
+        loss, eval_accuracy = model.get_model().evaluate(
+            test_images, test_labels, batch_size=self.args.batch_size
+        )
+        # See if it breaks
+        if epochs > 0:
+            diagnostic_data = [epochs, float(loss), float(eval_accuracy), float(train_accuracy)]
+            push_json(JSON_METRICS_PATH, diagnostic_data)
 
         # Return the loss, the number of examples evaluated on and the accuracy
         return float(loss), len(self.test_images), {"accuracy": float(eval_accuracy)}
@@ -192,17 +206,15 @@ class Client(fl.client.NumPyClient):
 # Function to Start the Client
 def start_fl_client():
     try:
-        with open(JSON_PATH, 'w', encoding='utf-8') as f:
-            json.dump([args.__dict__], f, ensure_ascii=False, indent=4)
+        make_json(path=JSON_METRICS_PATH, data=args.__dict__)
         client = Client(args).to_client()
         fl.client.start_client(server_address=args.server_address, client=client)
     except Exception as e:
         logger.error("Error starting FL client: %s", e)
         return {"status": "error", "message": str(e)}
-    
 
 if __name__ == "__main__":
-
+    DO_SHUFFLE = False
     # Model
     num_classes = 20 if COARSE_LEARNING else 100
     model = Model(
@@ -216,16 +228,14 @@ if __name__ == "__main__":
     train_accuracy: float = 0
     # Learning
     if LOCAL_LEARNING:
-        with open(f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.json', 'w', encoding='utf-8') as f:
-            json.dump([args.__dict__], f, ensure_ascii=False, indent=4)
+        make_json(path=JSON_METRICS_PATH, data=args.__dict__)
         c = Client(args)
         params = c.get_parameters()
-        
         while epochs < args.total_epochs:
             logger.info(f"Epoch {epochs}...")
             params, num_examples, results = c.fit(params)
             c.evaluate(params)
 
-        updatePlot(mode="solo", data_path=CLIENT_FOLDER)
+        updatePlot(data_path=CLIENT_FOLDER)
     else:
         start_fl_client()

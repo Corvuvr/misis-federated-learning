@@ -15,6 +15,7 @@ import flwr as fl
 from prometheus_client import Gauge, start_http_server
 from strategy.strategy import FedCustom
 from helpers.plots import updatePlot
+from helpers.load_data import make_json, push_json
 from flask import Flask, request, send_file
 
 RESIZE_DATA: bool = False
@@ -38,7 +39,13 @@ parser.add_argument(
     help="Number of FL rounds (default: 100)",
 )
 parser.add_argument(
+    "--split-type", type=str, default="fine", help="Distribute data among nodes by fine or coarse labels"
+)
+parser.add_argument(
     "--flask-address", type=str, default="0.0.0.0", help="Address of the data server"
+)
+parser.add_argument(
+    "--total-clients", type=int, default="0", help="Number of clients"
 )
 args = parser.parse_args()
 
@@ -98,6 +105,10 @@ def load_data_proxy():
     global total_clients
     global data
     global all_classes
+
+    global SPLIT_TYPE
+
+    # Get Ids of 
     class_partition = list(split_list_by_step(
         input=all_classes,
         step=np.ceil(len(all_classes)/total_clients)
@@ -105,8 +116,9 @@ def load_data_proxy():
     print(f'Client {client_id} will learn these classes: {class_partition}')
     
     # Get ids of the dataset part which has the mentioned classes
+    classes_to_split: list[int] = fine_labels if SPLIT_TYPE == "fine" else coarse_labels
     train_partition_indicies: list[int] = list(get_indicies_of_classes(
-        data=fine_labels, classes=class_partition
+        data=classes_to_split, classes=class_partition
     ))
     
     # Partition data
@@ -116,6 +128,7 @@ def load_data_proxy():
     partition_image_metadata = np.array(partition_images.shape).astype('int16')
     
     partition_images = partition_images.flatten().astype('float32')
+    print(f'Sent to client {client_id} the following fine classes: {set(partition_fine_labels)}')
 
     # Save data to zip
     data = (partition_image_metadata, partition_images, partition_fine_labels, partition_coarse_labels)
@@ -143,15 +156,27 @@ def run_flask_server(host='172.19.0.5', port=7272):
 # Main Function
 if __name__ == "__main__":
 
+    make_json('/results/server.json', args.__dict__)
+
+    SPLIT_TYPE: str = args.split_type
+
     # Initialize Strategy Instance 
     strategy_instance = FedCustom(accuracy_gauge=accuracy_gauge, loss_gauge=loss_gauge)
-    total_clients = 3
+    # total_clients = 3
+    total_clients = args.total_clients
 
     # Download dataset
     fds = FederatedDataset(dataset="cifar100", partitioners={"train": total_clients})
     data = fds.load_partition(0, "train")
     data.set_format("numpy")
-    all_classes: list[str] = [i for i, el in enumerate(data.info.features['fine_label'].names)]
+
+    match SPLIT_TYPE:
+        case "fine":
+            all_classes: list[str] = [i for i, el in enumerate(data.info.features['fine_label'].names)]
+        case "coarse":
+            all_classes: list[str] = [i for i, el in enumerate(data.info.features['coarse_label'].names)]
+        case _:
+            raise Exception(f"Wrong split type: {SPLIT_TYPE}. Should be: [ fine | coarse ]")
     
     # Prepare data to be sent
     images = np.array(data["img"]).astype(dtype='float32') / 255.0
@@ -169,5 +194,7 @@ if __name__ == "__main__":
     # Start FL Server
     start_fl_server(strategy=strategy_instance, rounds=args.number_of_rounds)
     print(f'{total_clients=}')
-    updatePlot(mode="fed", data_path='/results')
+    updatePlot(data_path='/results', num_clients=args.total_clients)
     thread.join()
+
+    raise Exception("Finished!")
