@@ -1,29 +1,12 @@
 # Exclude everything except project files
-*
-!.env
-!config/*
-!examples/*
-!model/*
-!results/*
-!helpers/*
-!strategy/*
-!client.py
-!server.py
-!Dockerfile*
-!requirments.txt
+
+results/*
 !results/README.md
 
-# Ignore runtime artifacts in project files
-results/*.json
-results/*.png
-results/*.h5
-results/**/*
-.venv/*
-
 # Ignore cache
-__pycache__/
-*.pyc
-.vscode/
-*.npz
-*.csv
-*.run
+**/__pycache__/
+**/*.pyc
+**/.vscode/
+**/*.npz
+**/*.csv
+**/*.run

@@ -1,55 +1,69 @@
-import argparse
-import logging
-import time
-import threading
-import logging
-import requests
+# Standard imports
 import zipfile
-
+import logging
+import threading
 import numpy as np
-import tensorflow as tf
-from flwr_datasets import FederatedDataset
+from typing import Sequence, Iterable, Generator
 
+# Federated stuff
 import flwr as fl
-
-from prometheus_client import Gauge, start_http_server
-from strategy.strategy import FedCustom
-from helpers.plots import updatePlot
-from helpers.load_data import make_json, push_json
 from flask import Flask, request, send_file
+from prometheus_client import Gauge, start_http_server
 
-RESIZE_DATA: bool = False
+# Local imports
+from dataset import get_full_dataset, get_split_partition, get_label_banks
+from strategy.strategy  import FedCustom
+from helpers.plots      import updatePlot
+from helpers.load_data  import make_json
+from helpers.server_args   import args
 
-# Initialize Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Define a gauge to track the global model accuracy
-accuracy_gauge = Gauge("model_accuracy", "Current accuracy of the global model")
+# =============================== FLASK DATASET SENDER ===============================
+dataset_sender = Flask(__name__)
+@dataset_sender.route('/establish_connection')
+def establish_connection():
+    return "Hello"
+@dataset_sender.route('/load_dataset')
+def load_data_proxy():
+    global args
+    global dataset
+    global label_banks  
+    client_id = int(request.args.get(key="client_id"))  
+    data: dict = get_split_partition(dataset=dataset, label_banks=label_banks, split_type=args.split_type, client_id=client_id)
+    flat: tuple[np.ndarray] = (
+        # Train
+        np.array(data["train"]["img"].shape).astype('int16'  ),
+        data["train"]["img"].flatten()      .astype('float32'),
+        data["train"]["fine_label"  ]       .astype('int16'  ), 
+        data["train"]["coarse_label"]       .astype('int16'  ),
+        # Test
+        np.array(data["test"]["img"].shape).astype('int16'  ),
+        data["test"]["img"].flatten()      .astype('float32'),
+        data["test"]["fine_label"  ]       .astype('int16'  ), 
+        data["test"]["coarse_label"]       .astype('int16'  ),
+    )
+    # Save data to zip
+    workdir = "/data/"
+    zip_filename = f"~data{client_id}.zip"
+    zip_filepath = f"{workdir}{zip_filename}"
+    zip = zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED)
+    for i, el in enumerate(flat):
+        tmp_filename = f"~tmp-{client_id}-{i}"
+        tmp_filepath = f"{workdir}{tmp_filename}"
+        el.tofile(tmp_filepath)
+        zip.write(tmp_filepath, arcname=tmp_filename)
+    zip.close()
+    return send_file(
+        path_or_file=zip_filepath,
+        download_name=zip_filename,
+    )
+def run_flask_server(host='172.19.0.5', port=7272):
+    logger.info(f"Running flask at: {host}:{port}")
+    dataset_sender.run(host=host, port=port)
 
-# Define a gauge to track the global model loss
-loss_gauge = Gauge("model_loss", "Current loss of the global model")
-
-# Parse command line arguments
-parser = argparse.ArgumentParser(description="Flower Server")
-parser.add_argument(
-    "--number-of-rounds",
-    type=int,
-    default=100,
-    help="Number of FL rounds (default: 100)",
-)
-parser.add_argument(
-    "--split-type", type=str, default="fine", help="Distribute data among nodes by fine or coarse labels"
-)
-parser.add_argument(
-    "--flask-address", type=str, default="0.0.0.0", help="Address of the data server"
-)
-parser.add_argument(
-    "--total-clients", type=int, default="0", help="Number of clients"
-)
-args = parser.parse_args()
-
-# Function to Start Federated Learning Server
+# =============================== FEDERATED LEARNING ===============================
 def start_fl_server(strategy, rounds):
     try:
         fl.server.start_server(
@@ -60,141 +74,45 @@ def start_fl_server(strategy, rounds):
     except Exception as e:
         logger.error(f"FL Server error: {e}", exc_info=True)
 
-def split_list_by_step(input: list, step: int):
-    if step <= 0:
-        return None
-    j = 0
-    while j < len(input):
-        partition: list = []
-        for i in range(len(input)):
-            try:
-                partition.append(input[j+i])
-            except:
-                j += i + 1
-                break
-            if i == step - 1:
-                j += i + 1
-                break
-        yield partition
+def legacy(b: bool):
+    def wrapper_(function):
+        def wrapper(*rgs, **kwargs):
+            if b:
+                # Load Dataset
+                global dataset
+                global label_banks
+                dataset = get_full_dataset(train_split=0.8, total_clients=args.total_clients)
+                label_banks = get_label_banks(dataset=dataset, split_type=args.split_type, total_clients=args.total_clients)
+                # Start Flask Dataset Server
+                lock = threading.Lock()
+                thread = threading.Thread(target=run_flask_server, args=(args.flask_address, 7272))
+                thread.start()
+                # Main
+                function(*rgs, **kwargs)
+                # End
+                thread.join()
+            else:
+                function(*rgs, **kwargs)
+            return
+        return wrapper
+    return wrapper_
 
-def get_indicies_of_classes(data, classes: list[str]):
-    for i in range(len(data)):
-        if data[i] in classes:
-            yield i
-
-# Dataset sender
-dataset_sender = Flask(__name__)
-
-@dataset_sender.route('/establish_connection')
-def establish_connection():
-    return "Hello"
-
-@dataset_sender.route('/load_dataset')
-def load_data_proxy():
-    
-    # Get node info
-    client_id = int(request.args.get(key="client_id"))
-    print(f"{request.args=}")
-    
-    # Get preloaded data
-    global images
-    global fine_labels 
-    global coarse_labels
-
-    # Get names of the classes that the specific client will learn
-    global total_clients
-    global data
-    global all_classes
-
-    global SPLIT_TYPE
-
-    # Get Ids of 
-    class_partition = list(split_list_by_step(
-        input=all_classes,
-        step=np.ceil(len(all_classes)/total_clients)
-    ))[client_id-1]
-    print(f'Client {client_id} will learn these classes: {class_partition}')
-    
-    # Get ids of the dataset part which has the mentioned classes
-    classes_to_split: list[int] = fine_labels if SPLIT_TYPE == "fine" else coarse_labels
-    train_partition_indicies: list[int] = list(get_indicies_of_classes(
-        data=classes_to_split, classes=class_partition
-    ))
-    
-    # Partition data
-    partition_images = np.array(images[train_partition_indicies])
-    partition_fine_labels = np.array(fine_labels[train_partition_indicies]).astype('int16')
-    partition_coarse_labels = np.array(coarse_labels[train_partition_indicies]).astype('int16')
-    partition_image_metadata = np.array(partition_images.shape).astype('int16')
-    
-    partition_images = partition_images.flatten().astype('float32')
-    print(f'Sent to client {client_id} the following fine classes: {set(partition_fine_labels)}')
-
-    # Save data to zip
-    data = (partition_image_metadata, partition_images, partition_fine_labels, partition_coarse_labels)
-    workdir = "/data/"
-    zip_filename = f"~data{client_id}.zip"
-    zip_filepath = f"{workdir}{zip_filename}"
-    zip = zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED)
-    for i, el in enumerate(data):
-        tmp_filename = f"~tmp-{client_id}-{i}"
-        tmp_filepath = f"{workdir}{tmp_filename}"
-        el.tofile(tmp_filepath)
-        zip.write(tmp_filepath, arcname=tmp_filename)
-    zip.close()
-
-    return send_file(
-        path_or_file=zip_filepath,
-        download_name=zip_filename,
-    )
-
-def run_flask_server(host='172.19.0.5', port=7272):
-    logger.info(f"Running flask at: {host}:{port}")
-    dataset_sender.run(host=host, port=port)
-    
-
-# Main Function
-if __name__ == "__main__":
-
-    make_json('/results/server.json', args.__dict__)
-
-    SPLIT_TYPE: str = args.split_type
-
+@legacy(args.legacy)
+def main():
+    global args
+    # Define gauges to track the accuracy and loss of the global model
+    accuracy_gauge = Gauge("model_accuracy", "Current accuracy of the global model")
+    loss_gauge = Gauge("model_loss", "Current loss of the global model")
     # Initialize Strategy Instance 
     strategy_instance = FedCustom(accuracy_gauge=accuracy_gauge, loss_gauge=loss_gauge)
-    # total_clients = 3
-    total_clients = args.total_clients
-
-    # Download dataset
-    fds = FederatedDataset(dataset="cifar100", partitioners={"train": total_clients})
-    data = fds.load_partition(0, "train")
-    data.set_format("numpy")
-
-    match SPLIT_TYPE:
-        case "fine":
-            all_classes: list[str] = [i for i, el in enumerate(data.info.features['fine_label'].names)]
-        case "coarse":
-            all_classes: list[str] = [i for i, el in enumerate(data.info.features['coarse_label'].names)]
-        case _:
-            raise Exception(f"Wrong split type: {SPLIT_TYPE}. Should be: [ fine | coarse ]")
-    
-    # Prepare data to be sent
-    images = np.array(data["img"]).astype(dtype='float32') / 255.0
-    fine_labels = np.array(data["fine_label"])
-    coarse_labels = np.array(data["coarse_label"])
-
-    # Start Prometheus Metrics Server
-    start_http_server(8000)
-    
-    # Start Dataset Server 
-    lock = threading.Lock()
-    thread = threading.Thread(target=run_flask_server, args=(args.flask_address, 7272))
-    thread.start()
-
-    # Start FL Server
-    start_fl_server(strategy=strategy_instance, rounds=args.number_of_rounds)
-    print(f'{total_clients=}')
-    updatePlot(data_path='/results', num_clients=args.total_clients)
-    thread.join()
-
+    # Start servers
+    start_http_server(8000) # Prometheus Metrics Server
+    start_fl_server(strategy=strategy_instance, rounds=args.number_of_rounds) # Flower Federated Learning Server
+    # Derive metrics
+    updatePlot(data_path='/results', num_clients=args.total_clients) 
+        
+# Main Function
+if __name__ == "__main__":
+    make_json('/results/server.json', args.__dict__)
+    main()
     raise Exception("Finished!")

@@ -1,7 +1,6 @@
 import os
 import time
 import logging
-import argparse
 import requests
 
 import flwr as fl
@@ -9,7 +8,8 @@ import tensorflow as tf
 
 from model.model import Model
 from helpers.plots import updatePlot
-from helpers.load_data import load_data, load_data_local, shuffle, scale_input, make_json, push_json
+from helpers.load_data import load_data, shuffle, push_json, make_json
+from helpers.client_args import args
 
 # Logs
 logging.basicConfig(level=logging.INFO)     # Configure logging
@@ -19,6 +19,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "0"    # Make TensorFlow log less verbose
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 logger.info(f"GPUS:\t{tf.config.list_physical_devices('GPU')}")
+logger.info(str(args))
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
@@ -31,93 +32,18 @@ if gpus:
     except RuntimeError as e:
         logger.error(e)
 
-# Parse command line arguments
-parser = argparse.ArgumentParser(description="Flower client")
-
-# Common args
-parser.add_argument(
-    "--batch-size", type=int, default=32, help="Batch size for training"
-)
-parser.add_argument(
-    "--learning-rate", type=float, default=0.1, help="Learning rate for the optimizer"
-)
-parser.add_argument(
-    "--data-percentage", type=float, default=0.5, help="Portion of client data to use"
-)
-parser.add_argument(
-    "--epochs-per-subset", type=int, default=10, help="Epochs in each iterations"
-)
-parser.add_argument(
-    "--total-epochs", type=int, default=500, help="Total epochs"
-)
-parser.add_argument(
-    "--scale", type=int, default=1, help="Scale the input of the model"
-)
-parser.add_argument(
-    "--alpha", type=float, default=1.0, help="Parameters of the model"
-)
-parser.add_argument(
-    "--train-split", type=float, default=0.8, help="In which proportion split partition"
-)
-parser.add_argument(
-    "--coarse", default=False, action='store_true', help="Whether to train on fine (superclass) labels or coarse (class) labels"
-)
-# Fed args
-parser.add_argument(
-    "--server-address", type=str, default="server:8080", help="Address of the fed server"
-)
-parser.add_argument(
-    "--flask-address", type=str, default="0.0.0.0", help="Address of the data server"
-)
-parser.add_argument(
-    "--client-id", type=int, default=1, help="Unique ID for the client"
-)
-parser.add_argument(
-    "--total-clients", type=int, default=2, help="Total number of clients"
-)
-
-# Local args
-parser.add_argument(
-    "--local", default=False, action='store_true', help="Whether to launch locally or as a federated client"
-)
-
-args = parser.parse_args()
-logger.info(str(args))
-
-# Globals
-LOCAL_LEARNING = args.local
-COARSE_LEARNING = args.coarse
-CLIENT_FOLDER = "results" if LOCAL_LEARNING else "/results"
-CLIENT_PREFIX: str = str(args.client_id) if not LOCAL_LEARNING else "-solo"
-JSON_METRICS_PATH = f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.json'
-WEIGHTS_PATH = f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.weights.h5'
-
-if not LOCAL_LEARNING:
-    wait_for_server: bool = True
-    while wait_for_server:
-        time.sleep(10)
-        try:
-            logger.info("Waiting for server...")
-            if requests.get(f'http://{args.flask_address}:7272/establish_connection'):
-                wait_for_server = False
-        except:
-            logger.info("Waiting for server...")
-    logger.error(f"Connection established. Initializing client{CLIENT_PREFIX}...")
-
+# ============================================ FEDERATED CLIENT ============================================
 class Client(fl.client.NumPyClient):
     def __init__(self, args):
         super().__init__()
         self.args = args
-
         logger.info("Preparing data...")
         (self.train_images, y_train, z_train), (self.test_images, y_test, z_test) = load_data(
-            client_id=self.args.client_id,
-            train_split = args.train_split, 
-            scale_factor = args.scale, 
-            server_ip=args.flask_address
-        ) if not LOCAL_LEARNING else load_data_local(
+            mode="local",
+            client_id=args.client_id,
+            total_clients=args.total_clients,
             train_split=args.train_split,
-            scale_factor=self.args.scale
+            server_ip=args.flask_address
         )
         self.train_labels = z_train if COARSE_LEARNING else y_train
         self.test_labels = z_test if COARSE_LEARNING else y_test
@@ -128,11 +54,8 @@ class Client(fl.client.NumPyClient):
         return model.get_model().get_weights()
 
     def fit(self, parameters, config=None):
-        
         global epochs
-        global args
         global train_accuracy
-        
         # Set the weights of the model
         model.get_model().set_weights(parameters)
         # Get training subset
@@ -143,16 +66,14 @@ class Client(fl.client.NumPyClient):
                 percentage=args.data_percentage,
                 args=(self.train_images, self.train_labels)
             )
+        # Early stopping after no improvement in N epochs 
+        es_callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=1)
         # Add a callback that saves weights
         cp_callback = tf.keras.callbacks.ModelCheckpoint(
             filepath=WEIGHTS_PATH,
             save_weights_only=True,
             verbose=1
         )
-
-        # Early stopping after no improvement in N epochs 
-        es_callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=1)
-        
         # Train the model
         history = model.get_model().fit(
             train_images,
@@ -162,46 +83,36 @@ class Client(fl.client.NumPyClient):
             callbacks=[es_callback], 
             epochs=args.epochs_per_subset
         )
-        
         # The reason why client 1st epoch is 0?
         epochs += args.epochs_per_subset
-        
         # Calculate evaluation metric
         train_accuracy = float(history.history["accuracy"][-1])
         results = { "accuracy": train_accuracy, }
 
         # Get the parameters after training
         parameters_prime = model.get_model().get_weights()
-
         # Directly return the parameters and the number of examples trained on
         return parameters_prime, len(self.train_images), results
 
-
     def evaluate(self, parameters, config=None):
-        
         global epochs
-        # Set the weights of the model
-        model.get_model().set_weights(parameters)
-        # Evaluate the model and get the loss and accuracy
-        test_images, test_labels = self.test_images, self.test_labels
         global DO_SHUFFLE
+        model.get_model().set_weights(parameters)
+        test_images, test_labels = self.test_images, self.test_labels
         if DO_SHUFFLE:
             test_images, test_labels = shuffle(
                 percentage=args.data_percentage,
                 args=(self.test_images, self.test_labels)
             )
-
+        # Evaluate the model and get the loss and accuracy
         loss, eval_accuracy = model.get_model().evaluate(
             test_images, test_labels, batch_size=self.args.batch_size
         )
-        # See if it breaks
         if epochs > 0:
             diagnostic_data = [epochs, float(loss), float(eval_accuracy), float(train_accuracy)]
             push_json(JSON_METRICS_PATH, diagnostic_data)
-
         # Return the loss, the number of examples evaluated on and the accuracy
         return float(loss), len(self.test_images), {"accuracy": float(eval_accuracy)}
-
 
 # Function to Start the Client
 def start_fl_client():
@@ -213,8 +124,30 @@ def start_fl_client():
         logger.error("Error starting FL client: %s", e)
         return {"status": "error", "message": str(e)}
 
+
+# ============================================ INIT ============================================
 if __name__ == "__main__":
+
+    # Globals
     DO_SHUFFLE = False
+    COARSE_LEARNING     = args.coarse
+    CLIENT_FOLDER       = "results" if args.mode == "local" else "/results"
+    CLIENT_PREFIX       = str(args.client_id) if not args.mode == "local" else "-solo"
+    WEIGHTS_PATH        = f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.weights.h5'
+    JSON_METRICS_PATH   = f'{CLIENT_FOLDER}/client{CLIENT_PREFIX}.json'
+
+    if args.mode == "legacy":
+        wait_for_server: bool = True
+        while wait_for_server:
+            time.sleep(10)
+            try:
+                logger.info("Waiting for server...")
+                if requests.get(f'http://{args.flask_address}:7272/establish_connection'):
+                    wait_for_server = False
+            except:
+                logger.info("Waiting for server...")
+        logger.error(f"Connection established. Initializing client{CLIENT_PREFIX}...")
+
     # Model
     num_classes = 20 if COARSE_LEARNING else 100
     model = Model(
@@ -224,10 +157,11 @@ if __name__ == "__main__":
         scale_input=args.scale
     )
     model.compile()
+
+    # Learning
     epochs: int = 0
     train_accuracy: float = 0
-    # Learning
-    if LOCAL_LEARNING:
+    if args.mode == "local":
         make_json(path=JSON_METRICS_PATH, data=args.__dict__)
         c = Client(args)
         params = c.get_parameters()
@@ -235,7 +169,6 @@ if __name__ == "__main__":
             logger.info(f"Epoch {epochs}...")
             params, num_examples, results = c.fit(params)
             c.evaluate(params)
-
         updatePlot(data_path=CLIENT_FOLDER)
     else:
         start_fl_client()
