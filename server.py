@@ -81,7 +81,7 @@ def legacy(b: bool):
                 # Load Dataset
                 global dataset
                 global label_banks
-                dataset = get_full_dataset(train_split=0.8, total_clients=args.total_clients)
+                dataset = get_full_dataset(train_split=0.8)
                 label_banks = get_label_banks(dataset=dataset, split_type=args.split_type, total_clients=args.total_clients)
                 # Start Flask Dataset Server
                 lock = threading.Lock()
