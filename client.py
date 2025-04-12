@@ -108,9 +108,9 @@ class Client(fl.client.NumPyClient):
         loss, eval_accuracy = model.get_model().evaluate(
             test_images, test_labels, batch_size=self.args.batch_size
         )
-        # if epochs > 0:
-        diagnostic_data = [epochs, float(loss), float(eval_accuracy), float(train_accuracy)]
-        push_json(JSON_METRICS_PATH, diagnostic_data)
+        if LOG_2_JSON:
+            diagnostic_data = [epochs, float(loss), float(eval_accuracy), float(train_accuracy)]
+            push_json(JSON_METRICS_PATH, diagnostic_data)
         # Return the loss, the number of examples evaluated on and the accuracy
         return float(loss), len(self.test_images), {"accuracy": float(eval_accuracy)}
 
@@ -129,6 +129,7 @@ def start_fl_client():
 if __name__ == "__main__":
 
     # Globals
+    LOG_2_JSON = False
     DO_SHUFFLE = False
     COARSE_LEARNING     = args.coarse
     CLIENT_FOLDER       = "results" if args.mode == "local" else "/results"
@@ -161,6 +162,7 @@ if __name__ == "__main__":
     # Learning
     epochs: int = 0
     train_accuracy: float = 0
+    LOG_2_JSON = True
     if args.mode == "local":
         make_json(path=JSON_METRICS_PATH, data=args.__dict__)
         c = Client(args)
