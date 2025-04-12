@@ -108,9 +108,9 @@ class Client(fl.client.NumPyClient):
         loss, eval_accuracy = model.get_model().evaluate(
             test_images, test_labels, batch_size=self.args.batch_size
         )
-        if epochs > 0:
-            diagnostic_data = [epochs, float(loss), float(eval_accuracy), float(train_accuracy)]
-            push_json(JSON_METRICS_PATH, diagnostic_data)
+        # if epochs > 0:
+        diagnostic_data = [epochs, float(loss), float(eval_accuracy), float(train_accuracy)]
+        push_json(JSON_METRICS_PATH, diagnostic_data)
         # Return the loss, the number of examples evaluated on and the accuracy
         return float(loss), len(self.test_images), {"accuracy": float(eval_accuracy)}
 

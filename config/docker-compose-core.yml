@@ -1,0 +1,94 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - 9090:9090
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: "1g"
+      restart_policy:
+        condition: on-failure
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - cadvisor
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    container_name: cadvisor
+    privileged: true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: "1g"
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - 3000:3000
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: "1g"
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./config/grafana.ini:/etc/grafana/grafana.ini
+      - ./config/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./config/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - prometheus
+      - cadvisor
+    command:
+      - --config=/etc/grafana/grafana.ini
+
+  server:
+    container_name: server
+    build:
+      context: .
+      dockerfile: config/Dockerfile.server
+    command: python server.py ${SERVER_PROPERTIES}
+    environment:
+      PYTHONUNBUFFERED: 1
+      FLASK_RUN_PORT: 6000
+      DOCKER_HOST_IP: host.docker.internal
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./results/server:/data
+      - ./results:/results
+    ports:
+      - "6000:6000"
+      - "7272:7272"
+      - "8265:8265"
+      - "8000:8000"
+    stop_signal: SIGINT
+    depends_on:
+      - prometheus
+      - grafana
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: "8g"
+  
