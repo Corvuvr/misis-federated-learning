@@ -70,7 +70,7 @@ services:
     command: python server.py ${SERVER_PROPERTIES}
     environment:
       PYTHONUNBUFFERED: 1
-      FLASK_RUN_PORT: 6000
+      FLASK_RUN_PORT: 5000
       DOCKER_HOST_IP: host.docker.internal
     volumes:
       - .:/app
@@ -78,7 +78,7 @@ services:
       - ./results/server:/data
       - ./results:/results
     ports:
-      - "6000:6000"
+      - "5000:5000"
       - "7272:7272"
       - "8265:8265"
       - "8000:8000"

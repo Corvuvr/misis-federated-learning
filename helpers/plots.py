@@ -58,7 +58,7 @@ def federated_clients(data_path, num_clients = 1):
     print("LOG: Making Plots...")
     # shape=(3,len(metrics)) cols=10,20,30...len(metrics)
     client_data: list = []
-    for i in range(1,num_clients+1):
+    for i in range(num_clients):
         with open(f'{data_path}/client{i}.json', 'r', encoding='utf-8') as f:
             # [ epochs, loss, eval_accuracy, train_accuracy ]
             df = np.array(json.load(f)[1:]).astype('float32').transpose()     
@@ -159,5 +159,4 @@ def updatePlot(data_path: str = ".", num_clients = 0):
     else:
         raise Exception('No clients!')
 if __name__=="__main__":
-    federated_clients(data_path='results', num_clients=2)
     pass

@@ -6,7 +6,7 @@ with open('.env', 'r', newline='\r\n') as env_file:
         if newline.startswith("TOTAL_CLIENTS"):
             num_clients: int = int(newline.split('=')[1])
 
-for i in range(1, 1 + num_clients):
+for i in range(num_clients):
     client_template: str = \
     f"""
   client{i}:

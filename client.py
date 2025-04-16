@@ -39,7 +39,8 @@ class Client(fl.client.NumPyClient):
         self.args = args
         logger.info("Preparing data...")
         (self.train_images, y_train, z_train), (self.test_images, y_test, z_test) = load_data(
-            mode="local",
+            mode=args.mode,
+            split_type=args.split_type,
             client_id=args.client_id,
             total_clients=args.total_clients,
             train_split=args.train_split,

@@ -14,11 +14,20 @@ from prometheus_client import Gauge, start_http_server
 from dataset import get_full_dataset, get_split_partition, get_label_banks
 from strategy.strategy  import FedCustom
 from helpers.plots      import updatePlot
-from helpers.load_data  import make_json
+from helpers.load_data  import make_json, push_json
 from helpers.server_args   import args
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+class JsonGauge(Gauge):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.json_name: str = f'/results/{args[0]}.json'
+        make_json(self.json_name, dict())
+    def set(self, value):
+        push_json(self.json_name, value)
+        return super().set(value)
 
 # =============================== FLASK DATASET SENDER ===============================
 dataset_sender = Flask(__name__)
@@ -101,8 +110,8 @@ def legacy(b: bool):
 def main():
     global args
     # Define gauges to track the accuracy and loss of the global model
-    accuracy_gauge = Gauge("model_accuracy", "Current accuracy of the global model")
-    loss_gauge = Gauge("model_loss", "Current loss of the global model")
+    accuracy_gauge = JsonGauge("model_accuracy", "Current accuracy of the global model")
+    loss_gauge = JsonGauge("model_loss", "Current loss of the global model")
     # Initialize Strategy Instance 
     strategy_instance = FedCustom(accuracy_gauge=accuracy_gauge, loss_gauge=loss_gauge)
     # Start servers

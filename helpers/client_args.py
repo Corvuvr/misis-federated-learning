@@ -33,6 +33,9 @@ parser.add_argument(
 parser.add_argument(
     "--mode", type=str, default="local", choices=["local", "fed", "legacy"], help="Whether to launch locally or as a federated client"
 )
+parser.add_argument(
+    "--split-type", type=str, default="coarse", choices=["coarse", "fine", "none"], help="Whether to launch split data by coarse or fine labels"
+)
 
 # Fed args
 parser.add_argument(

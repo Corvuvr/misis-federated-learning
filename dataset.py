@@ -25,6 +25,7 @@ def get_indicies_of_classes(data: Iterable, classes: list[str]) -> Generator[int
     """
     Yields sequence of item positions related to given class ids. 
     """
+    logger.info(f"Searching for {len(classes)} in data...")
     for i in range(len(data)):
         if data[i] in classes:
             yield i
@@ -41,7 +42,7 @@ def split_coarse_labels(num_clients: int) -> list[list[int]]:
     return list(
         split_sequence_by_step(
             seq=labels,
-            step=np.ceil(len(labels)/num_clients)
+            step=int(np.ceil(len(labels)/num_clients))
         )
     )
 
@@ -75,7 +76,6 @@ def split_fine_labels(num_clients: int) -> list[list]:
     # Extrapolate chunks until every client gets one
     i: int = 0
     while len(client_chunks) < num_clients:
-        logger.info(f"There is {len(client_chunks)} chunks, which is less than num clients - {num_clients}. Extrapolating...")
         logger.info(f"Duplicate chunk with id {i}: {client_chunks[i]}")
         client_chunks.append(client_chunks[i])
         i = (i+1) % len(client_chunks)
@@ -160,12 +160,15 @@ def get_split_partition(dataset: dict, label_banks: Sequence[int], split_type: s
     # Get ids of the dataset part which has the mentioned classes
     if split_type == "none":
         split_type = "coarse"
+    print(f"Hello World: {len(label_banks)=} {client_id=}")
     train_partition_indicies: list[int] = list(get_indicies_of_classes(
         data=dataset["train"][f"{split_type}_label"], classes=label_banks[client_id]
     ))
+    print(f"{len(train_partition_indicies)=}")
     test_partition_indicies: list[int] = list(get_indicies_of_classes(
         data=dataset["test"][f"{split_type}_label"],  classes=label_banks[client_id]
     ))
+    print(f"{len(test_partition_indicies)=}")
     # Derive data of given labels
     return { 
         "train": {
@@ -181,16 +184,13 @@ def get_split_partition(dataset: dict, label_banks: Sequence[int], split_type: s
     }
 
 # ======================================= EXECUTION =======================================
-def classic_scenario(split_type: str, total_clients: int, client_id: int):
+def classic_scenario(split_type: str, total_clients: int, client_id: int, train_split: float = 0.8):
     dataset: dict = get_full_dataset(
-        train_split=0.8
+        train_split=train_split
     )
     label_banks: list[Sequence[int]] = get_label_banks(
         split_type=split_type, total_clients=total_clients
     )
-    for bank in label_banks:
-        print(f"{len(bank)=}")
-
     data = get_split_partition(
         dataset=dataset, label_banks=label_banks, split_type=split_type, client_id=client_id
     )

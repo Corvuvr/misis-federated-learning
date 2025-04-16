@@ -88,9 +88,12 @@ def load_data_legacy(client_id: int, server_ip: str = "0.0.0.0"):
     test_coarse_labels = np.frombuffer(zipfile.ZipFile(io.BytesIO(buffer)).read(f'~tmp-{client_id}-{7}'),dtype='int16')
     return (train_images, train_fine_labels, train_coarse_labels), (test_images, test_fine_labels, test_coarse_labels)
 
-def load_data_fed(client_id, total_clients, train_split):
+def load_data_fed(client_id: int, total_clients: int, train_split: float = 0.8, split_type: str = "coarse"):
     partition = classic_scenario(
-        split_type="coarse", train_split=train_split, client_id=client_id, total_clients=total_clients
+        split_type=split_type, 
+        total_clients=total_clients,
+        client_id=client_id,
+        train_split=train_split
     )
     x_train = partition["train"]["img"         ]
     y_train = partition["train"]["fine_label"  ] 
@@ -101,7 +104,8 @@ def load_data_fed(client_id, total_clients, train_split):
     return (x_train, y_train, z_train), (x_test, y_test, z_test)
 
 def load_data(
-    mode: str = "local", 
+    mode: str = "local",
+    split_type: str = "coarse",
     client_id: int = 1, 
     total_clients: int = 2, 
     train_split: float = 0.8, 
@@ -111,7 +115,7 @@ def load_data(
         case "local":
             return load_data_local(train_split)
         case "fed":
-            return load_data_fed(client_id, total_clients, train_split)
+            return load_data_fed(client_id, total_clients, train_split, split_type)
         case "legacy":
             return load_data_legacy(client_id, server_ip)
         case _:
